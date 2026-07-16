@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Ponto</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#FFFFFF;
+  --paper:#FFFFFF;
+  --paper-dark:#F2F2F2;
+  --ink:#111111;
+  --muted:#5C5C5C;
+  --line:#CFCFCF;
+  --steel:#2F3E46;
+  --stamp-red:#A13636;
+  --confirm-green:#2E6B3E;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  padding:32px 16px 60px;
+}
+
+.wrap{max-width:760px;margin:0 auto;}
+
+.header{
+  text-align:center;
+  margin-bottom:22px;
+  color:var(--ink);
+  border-bottom:2px solid var(--ink);
+  padding-bottom:16px;
+}
+.header .eyebrow{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:3px;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+.header h1{
+  font-family:'Oswald',sans-serif;
+  font-weight:700;
+  font-size:30px;
+  letter-spacing:1px;
+  margin:6px 0 0;
+  text-transform:uppercase;
+  color:var(--ink);
+}
+.header .employee-name{
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+  letter-spacing:1px;
+  color:var(--ink);
+  margin-top:8px;
+  font-weight:700;
+}
+
+/* card */
+.card{
+  position:relative;
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  border-radius:4px;
+  padding:26px 26px 14px;
+}
+
+.clock-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--line);
+  padding-bottom:18px;
+  margin-bottom:20px;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.date-block .label{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+.date-block .value{
+  font-family:'Oswald',sans-serif;
+  font-size:20px;
+  font-weight:600;
+  text-transform:capitalize;
+  color:var(--ink);
+}
+.clock{
+  font-family:'Space Mono',monospace;
+  font-size:32px;
+  font-weight:700;
+  letter-spacing:1px;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+
+/* status strip */
+.punch-status{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin-bottom:16px;
+}
+.stamp-item{
+  border:1.5px solid var(--line);
+  border-radius:3px;
+  padding:8px 6px;
+  text-align:center;
+  background:var(--paper-dark);
+}
+.stamp-item .stamp-label{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:9.5px;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:3px;
+}
+.stamp-item .stamp-time{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted);
+}
+.stamp-item.done{border-color:var(--ink); background:#fff;}
+.stamp-item.done .stamp-time{color:var(--confirm-green);}
+
+.btn-main{
+  width:100%;
+  border:2px solid var(--ink);
+  background:var(--ink);
+  color:#fff;
+  border-radius:3px;
+  padding:17px 10px;
+  font-family:'Oswald',sans-serif;
+  font-size:16px;
+  font-weight:600;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:opacity .12s ease;
+  margin-bottom:10px;
+}
+.btn-main:hover{opacity:0.85;}
+.btn-main:active{opacity:0.7;}
+.btn-main:disabled{
+  background:var(--paper-dark);
+  color:var(--muted);
+  border-color:var(--line);
+  cursor:default;
+  opacity:1;
+}
+.btn-main .sub{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:0;
+  text-transform:none;
+  margin-top:4px;
+  opacity:0.85;
+}
+
+.btn-row{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap;}
+.edit-btn, .security-btn{
+  flex:1;
+  min-width:150px;
+  background:#fff;
+  border:1.5px solid var(--ink);
+  color:var(--ink);
+  border-radius:3px;
+  padding:9px 10px;
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  letter-spacing:0.5px;
+  cursor:pointer;
+}
+.edit-btn:hover, .security-btn:hover{background:var(--ink); color:#fff;}
+
+.summary{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:var(--paper-dark);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:10px 16px;
+  margin-bottom:22px;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+}
+.summary .tot-label{color:var(--muted); letter-spacing:1px; text-transform:uppercase; font-size:11px;}
+.summary .tot-value{font-size:18px; font-weight:700; color:var(--ink);}
+
+.toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.toolbar h2{
+  font-family:'Oswald',sans-serif;
+  font-size:15px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--ink);
+  margin:0;
+}
+.toolbar-actions{display:flex; gap:8px; flex-wrap:wrap;}
+.export-btn, .days-btn{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  background:#fff;
+  border:1px solid var(--ink);
+  border-radius:3px;
+  padding:6px 12px;
+  cursor:pointer;
+  color:var(--ink);
+}
+.export-btn:hover, .days-btn:hover{background:var(--ink); color:#fff;}
+.days-btn.active{background:var(--ink); color:#fff;}
+
+.days-panel{display:none;}
+.days-panel.show{display:block;}
+
+.month-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--paper-dark);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:8px 10px;
+  margin-bottom:10px;
+}
+.month-nav button{
+  border:1px solid var(--ink);
+  background:#fff;
+  border-radius:3px;
+  width:30px; height:28px;
+  font-family:'Space Mono',monospace;
+  font-size:14px;
+  cursor:pointer;
+  color:var(--ink);
+}
+.month-nav button:hover{background:var(--ink); color:#fff;}
+.month-nav .month-label{
+  font-family:'Oswald',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:1px;
+  text-transform:capitalize;
+  text-align:center;
+}
+.month-total{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  color:var(--ink);
+  font-weight:700;
+  text-align:center;
+}
+
+.table-wrap{
+  max-height:280px;
+  overflow-y:auto;
+  margin-bottom:8px;
+  border:1px solid var(--line);
+}
+table{width:100%; border-collapse:collapse; font-family:'Space Mono',monospace; font-size:12.5px;}
+th{
+  position:sticky; top:0;
+  background:var(--paper-dark);
+  text-align:left;
+  padding:6px 8px;
+  color:var(--ink);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:10.5px;
+  border-bottom:1.5px solid var(--ink);
+}
+td{padding:7px 8px; border-bottom:1px solid var(--line);}
+tr:last-child td{border-bottom:none;}
+.empty-row td{text-align:center; color:var(--muted); padding:22px 0; font-style:italic; font-family:'Inter',sans-serif;}
+.row-actions{display:flex; gap:6px;}
+.icon-btn{
+  background:none;border:none;cursor:pointer;font-size:13px; padding:2px 4px;
+}
+.icon-btn.edit{color:var(--steel);}
+.icon-btn.del{color:var(--stamp-red);}
+
+.footnote{
+  text-align:center;
+  color:var(--muted);
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  margin-top:18px;
+  letter-spacing:0.5px;
+}
+
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:#fff;
+  padding:10px 18px; border-radius:4px;
+  font-family:'Inter',sans-serif; font-size:13px;
+  opacity:0; transition:opacity .25s ease, transform .25s ease;
+  pointer-events:none;
+  z-index:50;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  display:none; align-items:center; justify-content:center; z-index:60;
+  padding:16px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:#fff; border:1.5px solid var(--ink); border-radius:4px; padding:22px 24px;
+  max-width:320px; text-align:center;
+}
+.modal p{font-family:'Inter',sans-serif; font-size:14px; margin:0 0 16px;}
+.modal-actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+.modal-actions button{
+  font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase;
+  padding:8px 16px; border-radius:3px; cursor:pointer; border:2px solid var(--ink);
+}
+.modal-actions .confirm{background:var(--ink); color:#fff;}
+.modal-actions .cancel{background:none; color:var(--ink);}
+
+.modal-wide{max-width:340px; text-align:left;}
+.modal-wide h3{
+  font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase;
+  letter-spacing:1px; margin:0 0 14px; color:var(--ink);
+}
+.field-row{margin-bottom:12px;}
+.field-row label{
+  display:block; font-family:'Space Mono',monospace; font-size:11px;
+  letter-spacing:0.5px; text-transform:uppercase; color:var(--muted); margin-bottom:4px;
+}
+.field-row input{
+  width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:3px;
+  font-family:'Space Mono',monospace; font-size:14px; background:#fff; color:var(--ink);
+}
+.field-row input:focus{outline:2px solid var(--ink); border-color:var(--ink);}
+.link-btn{
+  background:none; border:none; color:var(--steel); text-decoration:underline;
+  font-family:'Inter',sans-serif; font-size:12.5px; cursor:pointer; padding:0; margin-top:2px;
+}
+.hint-text{font-family:'Inter',sans-serif; font-size:12.5px; color:var(--muted); margin:0 0 14px;}
+.question-box{
+  background:var(--paper-dark); border:1px solid var(--line); border-radius:3px;
+  padding:10px 12px; font-family:'Inter',sans-serif; font-size:13px; margin-bottom:14px;
+}
+
+.receipt{
+  border:1px solid var(--line);
+  border-radius:3px;
+  margin-bottom:16px;
+  overflow:hidden;
+}
+.receipt-row{
+  display:flex; justify-content:space-between; gap:10px;
+  padding:9px 12px;
+  border-bottom:1px solid var(--line);
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+}
+.receipt-row:last-child{border-bottom:none;}
+.receipt-row .r-label{color:var(--muted);}
+.receipt-row .r-value{font-weight:700; color:var(--ink);}
+.receipt-row.total{background:var(--paper-dark); font-size:14.5px;}
+.receipt-row.total .r-value{font-size:16px;}
+.receipt-note{
+  font-family:'Inter',sans-serif; font-size:11.5px; color:var(--muted);
+  padding:8px 12px; background:#fff; font-style:italic;
+}
+
+@media (max-width:480px){
+  .clock{font-size:24px;}
+  .header h1{font-size:22px;}
+  .punch-status{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="eyebrow">Cartão de ponto digital</div>
+    <h1>Controle de Ponto</h1>
+    <div class="employee-name">Márcio Josoel do Nascimento Gonçalves</div>
+  </div>
+
+  <div class="card">
+    <div class="card-inner">
+      <div class="clock-row">
+        <div class="date-block">
+          <div class="label">Hoje</div>
+          <div class="value" id="dateValue">—</div>
+        </div>
+        <div class="clock" id="clock">00:00:00</div>
+      </div>
+
+      <div class="punch-status" id="punchStatus">
+        <div class="stamp-item" data-tipo="entrada"><span class="stamp-label">Entrada</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="almocoSaida"><span class="stamp-label">Saída Almoço</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="almocoVolta"><span class="stamp-label">Volta Almoço</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="saida"><span class="stamp-label">Saída</span><span class="stamp-time">—</span></div>
+      </div>
+
+      <button class="btn-main" id="punchBtn">Bater Ponto<span class="sub" id="punchBtnSub"></span></button>
+
+      <div class="btn-row">
+        <button class="edit-btn" id="editManualBtn">✎ Editar horários (protegido por senha)</button>
+        <button class="security-btn" id="securityBtn">🔒 Alterar senha</button>
+      </div>
+
+      <div class="summary">
+        <span class="tot-label">Total trabalhado hoje</span>
+        <span class="tot-value" id="totalHoje">—</span>
+      </div>
+
+      <div class="toolbar">
+        <h2>Histórico</h2>
+        <div class="toolbar-actions">
+          <button class="days-btn" id="daysBtn">Ver dias trabalhados</button>
+          <button class="export-btn" id="payrollBtn">💰 Fechar mês</button>
+          <button class="export-btn" id="exportBtn">Exportar CSV</button>
+        </div>
+      </div>
+
+      <div class="days-panel" id="daysPanel">
+        <div class="month-nav">
+          <button id="prevMonthBtn" aria-label="Mês anterior">‹</button>
+          <div>
+            <div class="month-label" id="monthLabel">—</div>
+            <div class="month-total" id="monthTotal">—</div>
+          </div>
+          <button id="nextMonthBtn" aria-label="Mês seguinte">›</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Entrada</th><th>S. Almoço</th><th>V. Almoço</th><th>Saída</th><th>Total</th><th></th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">Os dados ficam salvos automaticamente na sua conta. Ajustes de horário exigem senha.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- confirmação genérica (excluir dia, substituir batida) -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button class="cancel" id="modalCancel">Cancelar</button>
+      <button class="confirm" id="modalConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- pedir senha -->
+<div class="modal-overlay" id="passwordOverlay">
+  <div class="modal modal-wide">
+    <h3>Senha necessária</h3>
+    <p class="hint-text">Digite sua senha para ajustar os horários.</p>
+    <div class="field-row">
+      <label for="passwordInput">Senha</label>
+      <input type="password" id="passwordInput" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="passwordCancel">Cancelar</button>
+      <button class="confirm" id="passwordConfirm">Confirmar</button>
+    </div>
+    <button class="link-btn" id="forgotPasswordLink" style="margin-top:12px;">Esqueci minha senha</button>
+  </div>
+</div>
+
+<!-- pergunta de segurança para recuperação -->
+<div class="modal-overlay" id="forgotOverlay">
+  <div class="modal modal-wide">
+    <h3>Recuperar senha</h3>
+    <div class="question-box" id="forgotQuestionBox">—</div>
+    <div class="field-row">
+      <label for="forgotAnswer">Sua resposta</label>
+      <input type="text" id="forgotAnswer" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="forgotCancel">Cancelar</button>
+      <button class="confirm" id="forgotVerify">Verificar</button>
+    </div>
+  </div>
+</div>
+
+<!-- configurar / redefinir senha e pergunta -->
+<div class="modal-overlay" id="setupOverlay">
+  <div class="modal modal-wide">
+    <h3 id="setupTitle">Configurar senha</h3>
+    <p class="hint-text" id="setupHint">Crie uma senha para proteger os ajustes de ponto.</p>
+    <div class="field-row">
+      <label for="setupPassword">Nova senha</label>
+      <input type="password" id="setupPassword" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <label for="setupPasswordConfirm">Confirmar senha</label>
+      <input type="password" id="setupPasswordConfirm" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <label for="setupQuestion">Pergunta de segurança (caso esqueça a senha)</label>
+      <input type="text" id="setupQuestion" placeholder="Ex.: Nome do meu primeiro animal de estimação">
+    </div>
+    <div class="field-row">
+      <label for="setupAnswer">Resposta</label>
+      <input type="text" id="setupAnswer" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="setupCancel">Cancelar</button>
+      <button class="confirm" id="setupSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- configurar dados de remuneração -->
+<div class="modal-overlay" id="payrollSetupOverlay">
+  <div class="modal modal-wide">
+    <h3>Configurar remuneração</h3>
+    <p class="hint-text">Preencha uma vez. Uso isso pra somar seu pagamento no fechamento do mês. Como é estágio, não desconto INSS nem FGTS.</p>
+    <div class="field-row">
+      <label for="pSalario">Salário mensal (R$)</label>
+      <input type="number" step="0.01" min="0" id="pSalario" placeholder="Ex.: 1500.00">
+    </div>
+    <div class="field-row">
+      <label for="pDias">Dias úteis previstos no mês</label>
+      <input type="number" step="1" min="1" id="pDias" placeholder="Ex.: 22">
+    </div>
+    <div class="field-row">
+      <label for="pVA">Vale Alimentação por dia trabalhado (R$)</label>
+      <input type="number" step="0.01" min="0" id="pVA" placeholder="Ex.: 25.00">
+    </div>
+    <div class="field-row">
+      <label for="pVC">Vale Combustível por dia trabalhado (R$)</label>
+      <input type="number" step="0.01" min="0" id="pVC" placeholder="Ex.: 15.00">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="payrollSetupCancel">Cancelar</button>
+      <button class="confirm" id="payrollSetupSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- fechamento do mês -->
+<div class="modal-overlay" id="payrollOverlay">
+  <div class="modal modal-wide">
+    <h3 id="payrollTitle">Fechamento do mês</h3>
+    <div class="receipt" id="payrollReceipt"></div>
+    <div class="modal-actions">
+      <button class="cancel" id="payrollEditData">Editar valores</button>
+      <button class="confirm" id="payrollClose">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- editar horários -->
+<div class="modal-overlay" id="editModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Editar horários</h3>
+    <div class="field-row">
+      <label for="editDate">Data</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="field-row">
+      <label for="editEntrada">Entrada</label>
+      <input type="time" id="editEntrada">
+    </div>
+    <div class="field-row">
+      <label for="editAlmocoSaida">Saída Almoço</label>
+      <input type="time" id="editAlmocoSaida">
+    </div>
+    <div class="field-row">
+      <label for="editAlmocoVolta">Volta Almoço</label>
+      <input type="time" id="editAlmocoVolta">
+    </div>
+    <div class="field-row">
+      <label for="editSaida">Saída</label>
+      <input type="time" id="editSaida">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="editCancel">Cancelar</button>
+      <button class="confirm" id="editSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ponto-records';
+const SECURITY_KEY = 'ponto-security';
+const PAYROLL_KEY = 'ponto-payroll';
+const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
+const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
+let records = {};
+let security = null; // {passwordHash, question, answerHash}
+let payroll = null; // {salario, diasPrevistos, va, vc}
+let viewMonth = null; // 'YYYY-MM'
+let pendingAction = null; // 'edit' | 'changePassword'
+let pendingEditDate = null;
+let setupMode = 'initial'; // 'initial' | 'change' | 'reset'
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function nowTime(){
+  const d = new Date();
+  return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function displayDate(key){
+  const [y,m,d] = key.split('-');
+  const dt = new Date(+y, +m-1, +d);
+  const dias = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  return `${pad(d)}/${pad(m)}/${y} · ${dias[dt.getDay()]}`;
+}
+function displayDateShort(key){
+  const [y,m,d] = key.split('-');
+  return `${pad(d)}/${pad(m)}/${y}`;
+}
+function monthKeyOf(key){ return key.slice(0,7); }
+function monthLabelOf(mk){
+  const [y,m] = mk.split('-');
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  return `${meses[+m-1]} de ${y}`;
+}
+function shiftMonth(mk, delta){
+  let [y,m] = mk.split('-').map(Number);
+  m += delta;
+  if(m<1){ m=12; y-=1; } else if(m>12){ m=1; y+=1; }
+  return `${y}-${pad(m)}`;
+}
+
+function formatBRL(n){
+  return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function timeToMinutes(t){
+  if(!t) return null;
+  const [h,m] = t.split(':').map(Number);
+  return h*60+m;
+}
+function calcTotal(rec){
+  if(!rec) return null;
+  const e = timeToMinutes(rec.entrada);
+  const as = timeToMinutes(rec.almocoSaida);
+  const av = timeToMinutes(rec.almocoVolta);
+  const s = timeToMinutes(rec.saida);
+  let mins = 0;
+  let complete = true;
+  if(e!==null && as!==null){ mins += (as-e); } else complete = false;
+  if(av!==null && s!==null){ mins += (s-av); } else complete = false;
+  if(mins<=0 && !complete) return null;
+  const h = Math.floor(mins/60);
+  const mm = mins%60;
+  return {text:`${h}h${pad(mm)}`, mins, complete};
+}
+
+// --- hashing simples (SHA-256) para não guardar senha em texto puro ---
+async function hashText(text){
+  const enc = new TextEncoder().encode('ponto-app::'+text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// --- camada de armazenamento: usa a nuvem do Claude quando disponível,
+// e cai para o armazenamento do próprio aparelho (localStorage) quando o
+// app roda fora do Claude (instalado como PWA/APK no celular). Mesmas
+// chaves nos dois casos, para nunca perder os dados já registrados.
+function hasCloudStorage(){
+  return typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+}
+async function storageGet(key){
+  if(hasCloudStorage()){
+    try{ return await window.storage.get(key, false); }catch(e){ /* cai para local */ }
+  }
+  const raw = localStorage.getItem(key);
+  return raw !== null ? {value: raw} : null;
+}
+async function storageSet(key, value){
+  if(hasCloudStorage()){
+    try{ await window.storage.set(key, value, false); return true; }catch(e){ /* cai para local */ }
+  }
+  try{
+    localStorage.setItem(key, value);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function loadRecords(){
+  try{
+    const res = await storageGet(STORAGE_KEY);
+    records = res && res.value ? JSON.parse(res.value) : {};
+  }catch(e){
+    records = {};
+  }
+}
+async function saveRecords(){
+  const ok = await storageSet(STORAGE_KEY, JSON.stringify(records));
+  if(!ok) showToast('Não foi possível salvar. Tente novamente.');
+}
+async function loadSecurity(){
+  try{
+    const res = await storageGet(SECURITY_KEY);
+    security = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    security = null;
+  }
+}
+async function saveSecurity(sec){
+  security = sec;
+  const ok = await storageSet(SECURITY_KEY, JSON.stringify(sec));
+  if(!ok) showToast('Não foi possível salvar a senha. Tente novamente.');
+}
+async function loadPayroll(){
+  try{
+    const res = await storageGet(PAYROLL_KEY);
+    payroll = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    payroll = null;
+  }
+}
+async function savePayroll(p){
+  payroll = p;
+  const ok = await storageSet(PAYROLL_KEY, JSON.stringify(p));
+  if(!ok) showToast('Não foi possível salvar os dados de remuneração.');
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function askConfirm(text){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById('modalOverlay');
+    document.getElementById('modalText').textContent = text;
+    overlay.classList.add('show');
+    const cleanup = (val)=>{
+      overlay.classList.remove('show');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    };
+    const confirmBtn = document.getElementById('modalConfirm');
+    const cancelBtn = document.getElementById('modalCancel');
+    const onConfirm = ()=>cleanup(true);
+    const onCancel = ()=>cleanup(false);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// --- batida única, sequencial ---
+function nextPendingTipo(rec){
+  for(const t of TIPOS){
+    if(!rec || !rec[t]) return t;
+  }
+  return null;
+}
+
+async function registrar(tipo){
+  const key = todayKey();
+  if(!records[key]){
+    records[key] = {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  }
+  const rec = records[key];
+  rec[tipo] = nowTime();
+  await saveRecords();
+  renderToday();
+  renderHistory();
+  showToast(`${LABELS[tipo]} registrada às ${rec[tipo]}`);
+}
+
+async function handlePunch(){
+  const key = todayKey();
+  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  const tipo = nextPendingTipo(rec);
+  if(!tipo){
+    showToast('Todas as batidas de hoje já foram feitas. Use "Editar horários" para ajustar.');
+    return;
+  }
+  await registrar(tipo);
+}
+
+function updatePunchButton(){
+  const rec = records[todayKey()] || {};
+  const tipo = nextPendingTipo(rec);
+  const btn = document.getElementById('punchBtn');
+  const sub = document.getElementById('punchBtnSub');
+  if(!tipo){
+    btn.disabled = true;
+    btn.firstChild.textContent = 'Dia completo ✓';
+    sub.textContent = '';
+  }else{
+    btn.disabled = false;
+    btn.firstChild.textContent = `Bater ${LABELS[tipo]}`;
+    const doneCount = TIPOS.indexOf(tipo);
+    sub.textContent = doneCount===0 ? 'próxima batida' : `${doneCount} de 4 já registradas`;
+  }
+}
+
+function renderToday(){
+  document.getElementById('dateValue').textContent = displayDate(todayKey());
+  const rec = records[todayKey()] || {};
+  TIPOS.forEach(tipo=>{
+    const item = document.querySelector(`.stamp-item[data-tipo="${tipo}"]`);
+    const span = item.querySelector('.stamp-time');
+    if(rec[tipo]){
+      span.textContent = rec[tipo];
+      item.classList.add('done');
+    }else{
+      span.textContent = '—';
+      item.classList.remove('done');
+    }
+  });
+  const tot = calcTotal(rec);
+  document.getElementById('totalHoje').textContent = tot ? tot.text + (tot.complete?'':' (parcial)') : '—';
+  updatePunchButton();
+}
+
+// --- fluxo de senha ---
+function openPasswordPrompt(){
+  document.getElementById('passwordInput').value = '';
+  document.getElementById('passwordOverlay').classList.add('show');
+}
+function closePasswordPrompt(){
+  document.getElementById('passwordOverlay').classList.remove('show');
+}
+function openForgot(){
+  document.getElementById('forgotQuestionBox').textContent = security && security.question ? security.question : '—';
+  document.getElementById('forgotAnswer').value = '';
+  document.getElementById('forgotOverlay').classList.add('show');
+}
+function closeForgot(){
+  document.getElementById('forgotOverlay').classList.remove('show');
+}
+function openSetup(mode){
+  setupMode = mode;
+  const title = document.getElementById('setupTitle');
+  const hint = document.getElementById('setupHint');
+  if(mode==='initial'){
+    title.textContent = 'Configurar senha';
+    hint.textContent = 'Crie uma senha para proteger os ajustes de ponto, e uma pergunta de segurança para caso esqueça.';
+  }else if(mode==='change'){
+    title.textContent = 'Alterar senha';
+    hint.textContent = 'Defina a nova senha e (se quiser) atualize a pergunta de segurança.';
+  }else{
+    title.textContent = 'Redefinir senha';
+    hint.textContent = 'Resposta confirmada. Defina uma nova senha.';
+  }
+  document.getElementById('setupPassword').value = '';
+  document.getElementById('setupPasswordConfirm').value = '';
+  document.getElementById('setupQuestion').value = security ? (security.question||'') : '';
+  document.getElementById('setupAnswer').value = '';
+  document.getElementById('setupOverlay').classList.add('show');
+}
+function closeSetup(){
+  document.getElementById('setupOverlay').classList.remove('show');
+}
+
+function requestPasswordThen(action, dateKey){
+  pendingAction = action;
+  pendingEditDate = dateKey || null;
+  if(!security){
+    openSetup('initial');
+    return;
+  }
+  openPasswordPrompt();
+}
+
+async function onPasswordConfirm(){
+  const typed = document.getElementById('passwordInput').value;
+  if(!typed){ showToast('Digite a senha.'); return; }
+  const hash = await hashText(typed);
+  if(hash !== security.passwordHash){
+    showToast('Senha incorreta.');
+    return;
+  }
+  closePasswordPrompt();
+  if(pendingAction === 'edit'){
+    openEditModal(pendingEditDate || todayKey());
+  }else if(pendingAction === 'changePassword'){
+    openSetup('change');
+  }
+}
+
+async function onForgotVerify(){
+  const typed = document.getElementById('forgotAnswer').value.trim();
+  if(!typed){ showToast('Digite sua resposta.'); return; }
+  const hash = await hashText(typed.toLowerCase());
+  if(hash !== security.answerHash){
+    showToast('Resposta incorreta.');
+    return;
+  }
+  closeForgot();
+  openSetup('reset');
+}
+
+async function onSetupSave(){
+  const p1 = document.getElementById('setupPassword').value;
+  const p2 = document.getElementById('setupPasswordConfirm').value;
+  const question = document.getElementById('setupQuestion').value.trim();
+  const answer = document.getElementById('setupAnswer').value.trim();
+  if(!p1 || p1.length < 4){ showToast('A senha deve ter pelo menos 4 caracteres.'); return; }
+  if(p1 !== p2){ showToast('As senhas não coincidem.'); return; }
+  if(!question || !answer){ showToast('Preencha a pergunta e a resposta de segurança.'); return; }
+  const passwordHash = await hashText(p1);
+  const answerHash = await hashText(answer.toLowerCase());
+  await saveSecurity({passwordHash, question, answerHash});
+  closeSetup();
+  showToast('Senha salva com sucesso.');
+  if(pendingAction === 'edit'){
+    openEditModal(pendingEditDate || todayKey());
+  }
+  pendingAction = null;
+  pendingEditDate = null;
+}
+
+// --- edição manual ---
+function openEditModal(dateKey){
+  const key = dateKey || todayKey();
+  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  document.getElementById('editDate').value = key;
+  document.getElementById('editEntrada').value = (rec.entrada||'').slice(0,5);
+  document.getElementById('editAlmocoSaida').value = (rec.almocoSaida||'').slice(0,5);
+  document.getElementById('editAlmocoVolta').value = (rec.almocoVolta||'').slice(0,5);
+  document.getElementById('editSaida').value = (rec.saida||'').slice(0,5);
+  document.getElementById('editModalOverlay').classList.add('show');
+}
+function closeEditModal(){
+  document.getElementById('editModalOverlay').classList.remove('show');
+}
+function loadRecordIntoEditForm(key){
+  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  document.getElementById('editEntrada').value = (rec.entrada||'').slice(0,5);
+  document.getElementById('editAlmocoSaida').value = (rec.almocoSaida||'').slice(0,5);
+  document.getElementById('editAlmocoVolta').value = (rec.almocoVolta||'').slice(0,5);
+  document.getElementById('editSaida').value = (rec.saida||'').slice(0,5);
+}
+async function saveManualEdit(){
+  const key = document.getElementById('editDate').value;
+  if(!key){ showToast('Selecione uma data válida.'); return; }
+  const vals = {
+    entrada: document.getElementById('editEntrada').value,
+    almocoSaida: document.getElementById('editAlmocoSaida').value,
+    almocoVolta: document.getElementById('editAlmocoVolta').value,
+    saida: document.getElementById('editSaida').value,
+  };
+  const rec = {};
+  TIPOS.forEach(t=>{ rec[t] = vals[t] ? vals[t]+':00' : null; });
+  records[key] = rec;
+  await saveRecords();
+  renderToday();
+  renderHistory();
+  closeEditModal();
+  showToast(`Horários de ${displayDateShort(key)} salvos.`);
+}
+
+// --- fechamento do mês / remuneração ---
+function openPayrollSetup(){
+  document.getElementById('pSalario').value = payroll ? payroll.salario : '';
+  document.getElementById('pDias').value = payroll ? payroll.diasPrevistos : '';
+  document.getElementById('pVA').value = payroll ? payroll.va : '';
+  document.getElementById('pVC').value = payroll ? payroll.vc : '';
+  document.getElementById('payrollSetupOverlay').classList.add('show');
+}
+function closePayrollSetup(){
+  document.getElementById('payrollSetupOverlay').classList.remove('show');
+}
+async function onPayrollSetupSave(){
+  const salario = parseFloat(document.getElementById('pSalario').value);
+  const diasPrevistos = parseInt(document.getElementById('pDias').value, 10);
+  const va = parseFloat(document.getElementById('pVA').value) || 0;
+  const vc = parseFloat(document.getElementById('pVC').value) || 0;
+  if(!salario || salario<=0){ showToast('Informe um salário válido.'); return; }
+  if(!diasPrevistos || diasPrevistos<=0){ showToast('Informe os dias úteis previstos no mês.'); return; }
+  await savePayroll({salario, diasPrevistos, va, vc});
+  closePayrollSetup();
+  showToast('Dados de remuneração salvos.');
+  openPayrollSummary();
+}
+
+function diasTrabalhadosNoMes(mk){
+  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].entrada).length;
+}
+
+function openPayrollSummary(){
+  if(!payroll){ openPayrollSetup(); return; }
+  const mk = viewMonth;
+  const dias = diasTrabalhadosNoMes(mk);
+  const diaValor = payroll.salario / payroll.diasPrevistos;
+  let salarioMes = diaValor * dias;
+  if(dias >= payroll.diasPrevistos) salarioMes = payroll.salario;
+  const vaMes = payroll.va * dias;
+  const vcMes = payroll.vc * dias;
+  const totalMes = salarioMes + vaMes + vcMes;
+
+  document.getElementById('payrollTitle').textContent = `Fechamento — ${monthLabelOf(mk)}`;
+  document.getElementById('payrollReceipt').innerHTML = `
+    <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${dias} de ${payroll.diasPrevistos}</span></div>
+    <div class="receipt-row"><span class="r-label">Salário (proporcional)</span><span class="r-value">${formatBRL(salarioMes)}</span></div>
+    <div class="receipt-row"><span class="r-label">Vale Alimentação</span><span class="r-value">${formatBRL(vaMes)}</span></div>
+    <div class="receipt-row"><span class="r-label">Vale Combustível</span><span class="r-value">${formatBRL(vcMes)}</span></div>
+    <div class="receipt-row total"><span class="r-label">Total do mês</span><span class="r-value">${formatBRL(totalMes)}</span></div>
+  `;
+  document.getElementById('payrollOverlay').classList.add('show');
+}
+function closePayrollSummary(){
+  document.getElementById('payrollOverlay').classList.remove('show');
+}
+
+function maybeAutoShowPayroll(){
+  const d = new Date();
+  if(d.getDate() >= 30 && payroll){
+    const flagKey = 'ponto-payroll-shown-'+todayKey();
+    if(!sessionStorage.getItem(flagKey)){
+      sessionStorage.setItem(flagKey, '1');
+      openPayrollSummary();
+    }
+  }
+}
+
+// --- histórico por mês ---
+function renderHistory(){
+  document.getElementById('monthLabel').textContent = monthLabelOf(viewMonth);
+  const tbody = document.getElementById('tbody');
+  const keys = Object.keys(records).filter(k=>monthKeyOf(k)===viewMonth).sort().reverse();
+
+  let totalMins = 0;
+  keys.forEach(k=>{
+    const tot = calcTotal(records[k]);
+    if(tot) totalMins += tot.mins;
+  });
+  const th = Math.floor(totalMins/60), tm = totalMins%60;
+  document.getElementById('monthTotal').textContent = keys.length
+    ? `${keys.length} dia(s) · total ${th}h${pad(tm)}`
+    : 'nenhum registro neste mês';
+
+  if(keys.length===0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Nenhum registro neste mês.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = keys.map(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    return `<tr>
+      <td>${displayDateShort(key)}</td>
+      <td>${rec.entrada||'—'}</td>
+      <td>${rec.almocoSaida||'—'}</td>
+      <td>${rec.almocoVolta||'—'}</td>
+      <td>${rec.saida||'—'}</td>
+      <td>${tot?tot.text:'—'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn edit" data-key="${key}" title="Editar (senha)">✎</button>
+          <button class="icon-btn del" data-key="${key}" title="Excluir dia">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.icon-btn.edit').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      requestPasswordThen('edit', btn.dataset.key);
+    });
+  });
+  tbody.querySelectorAll('.icon-btn.del').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ok = await askConfirm(`Excluir todos os registros de ${displayDateShort(btn.dataset.key)}?`);
+      if(!ok) return;
+      delete records[btn.dataset.key];
+      await saveRecords();
+      renderToday();
+      renderHistory();
+    });
+  });
+}
+
+function tickClock(){
+  document.getElementById('clock').textContent = nowTime();
+}
+
+function exportCSV(){
+  const keys = Object.keys(records).sort();
+  if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
+  let csv = 'Funcionario;Márcio Josoel do Nascimento Gonçalves\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total\n';
+  keys.forEach(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    csv += [displayDateShort(key), rec.entrada||'', rec.almocoSaida||'', rec.almocoVolta||'', rec.saida||'', tot?tot.text:''].join(';') + '\n';
+  });
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'controle_de_ponto.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('punchBtn').addEventListener('click', handlePunch);
+document.getElementById('editManualBtn').addEventListener('click', ()=>requestPasswordThen('edit', todayKey()));
+document.getElementById('securityBtn').addEventListener('click', ()=>requestPasswordThen('changePassword'));
+
+document.getElementById('passwordConfirm').addEventListener('click', onPasswordConfirm);
+document.getElementById('passwordCancel').addEventListener('click', closePasswordPrompt);
+document.getElementById('forgotPasswordLink').addEventListener('click', ()=>{ closePasswordPrompt(); openForgot(); });
+document.getElementById('forgotCancel').addEventListener('click', closeForgot);
+document.getElementById('forgotVerify').addEventListener('click', onForgotVerify);
+document.getElementById('setupCancel').addEventListener('click', ()=>{ closeSetup(); pendingAction=null; pendingEditDate=null; });
+document.getElementById('setupSave').addEventListener('click', onSetupSave);
+
+document.getElementById('editCancel').addEventListener('click', closeEditModal);
+document.getElementById('editSave').addEventListener('click', saveManualEdit);
+document.getElementById('editDate').addEventListener('change', (e)=>loadRecordIntoEditForm(e.target.value));
+
+document.getElementById('exportBtn').addEventListener('click', exportCSV);
+
+document.getElementById('payrollBtn').addEventListener('click', openPayrollSummary);
+document.getElementById('payrollSetupCancel').addEventListener('click', closePayrollSetup);
+document.getElementById('payrollSetupSave').addEventListener('click', onPayrollSetupSave);
+document.getElementById('payrollClose').addEventListener('click', closePayrollSummary);
+document.getElementById('payrollEditData').addEventListener('click', ()=>{ closePayrollSummary(); openPayrollSetup(); });
+
+const daysBtn = document.getElementById('daysBtn');
+const daysPanel = document.getElementById('daysPanel');
+daysBtn.addEventListener('click', ()=>{
+  const showing = daysPanel.classList.toggle('show');
+  daysBtn.classList.toggle('active', showing);
+  daysBtn.textContent = showing ? 'Ocultar dias trabalhados' : 'Ver dias trabalhados';
+});
+document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, -1);
+  renderHistory();
+});
+document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, 1);
+  renderHistory();
+});
+
+(async function init(){
+  viewMonth = todayKey().slice(0,7);
+  await loadRecords();
+  await loadSecurity();
+  await loadPayroll();
+  renderToday();
+  renderHistory();
+  tickClock();
+  setInterval(tickClock, 1000);
+  if(!payroll){
+    openPayrollSetup();
+  }else{
+    maybeAutoShowPayroll();
+  }
+  if('serviceWorker' in navigator){
+    try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ /* opcional */ }
+  }
+})();
+</script>
+</body>
+</html>
