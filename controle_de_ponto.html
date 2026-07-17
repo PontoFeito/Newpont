@@ -347,6 +347,55 @@ tr:last-child td{border-bottom:none;}
 .modal-actions .cancel{background:none; color:var(--ink);}
 
 .modal-wide{max-width:340px; text-align:left;}
+
+.fullscreen-overlay{
+  position:fixed; inset:0; background:#f4f1ea;
+  display:none; flex-direction:column; z-index:80;
+}
+.fullscreen-overlay.show{display:flex;}
+.fs-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; border-bottom:2px solid var(--ink); background:#fff;
+  flex-shrink:0;
+}
+.fs-header h2{margin:0; font-family:'Space Grotesk',sans-serif; font-size:20px; letter-spacing:0.5px;}
+.fs-close{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:36px; height:36px; font-size:18px; cursor:pointer; flex-shrink:0;
+}
+.fs-nav{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 18px; border-bottom:1px solid #ccc; background:#fff;
+  flex-shrink:0;
+}
+.fs-nav button{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:34px; height:34px; font-size:16px; cursor:pointer;
+}
+.fs-nav .fs-month-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;}
+.fs-nav .fs-month-total{font-family:'Inter',sans-serif; font-size:12px; color:#555;}
+.fs-body{flex:1; overflow-y:auto; padding:14px 16px 40px;}
+.fs-card{
+  background:#fff; border:1.5px solid var(--ink); border-radius:4px;
+  padding:12px 14px; margin-bottom:10px;
+}
+.fs-card-date{
+  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;
+}
+.fs-card-falta{color:var(--stamp-red); font-weight:700; font-family:'Inter',sans-serif;}
+.fs-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:8px;
+}
+.fs-grid div{text-align:center;}
+.fs-grid .fs-lbl{font-family:'Inter',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#777;}
+.fs-grid .fs-val{font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;}
+.fs-totals{
+  display:flex; justify-content:space-between; padding-top:8px; border-top:1px dashed #ccc;
+  font-family:'Inter',sans-serif; font-size:13px;
+}
+.fs-totals .extra{color:var(--stamp-red); font-weight:600;}
+.fs-empty{text-align:center; color:#888; font-family:'Inter',sans-serif; padding:30px 0;}
 .modal-wide h3{
   font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase;
   letter-spacing:1px; margin:0 0 14px; color:var(--ink);
@@ -451,6 +500,7 @@ tr:last-child td{border-bottom:none;}
         <h2>Histórico</h2>
         <div class="toolbar-actions">
           <button class="days-btn" id="daysBtn">Ver dias trabalhados</button>
+          <button class="export-btn" id="fullscreenBtn">🔍 Tela cheia</button>
           <button class="export-btn" id="payrollBtn">💰 Fechar mês</button>
           <button class="export-btn" id="exportBtn">Exportar CSV</button>
         </div>
@@ -477,6 +527,23 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 
+  <!-- detalhamento em tela cheia -->
+  <div class="fullscreen-overlay" id="fullscreenOverlay">
+    <div class="fs-header">
+      <h2>Detalhamento de pontos</h2>
+      <button class="fs-close" id="fsCloseBtn" aria-label="Fechar">✕</button>
+    </div>
+    <div class="fs-nav">
+      <button id="fsPrevMonthBtn" aria-label="Mês anterior">‹</button>
+      <div>
+        <div class="fs-month-label" id="fsMonthLabel">—</div>
+        <div class="fs-month-total" id="fsMonthTotal">—</div>
+      </div>
+      <button id="fsNextMonthBtn" aria-label="Mês seguinte">›</button>
+    </div>
+    <div class="fs-body" id="fsBody"></div>
+  </div>
+
   <div class="footnote">Os dados ficam salvos automaticamente na sua conta. Ajustes e exclusões exigem senha (ou digital/Face ID, se ativada).</div>
 </div>
 
@@ -485,8 +552,8 @@ tr:last-child td{border-bottom:none;}
 <!-- login -->
 <div class="modal-overlay" id="authOverlay" style="z-index:100;">
   <div class="modal modal-wide">
-    <h3>Entrar</h3>
-    <p class="hint-text">Acesso restrito. As contas são criadas manualmente pelo administrador no Firebase.</p>
+    <h3 id="authTitle">Entrar</h3>
+    <p class="hint-text" id="authHint">Acesso restrito. Entre com sua conta.</p>
     <div class="field-row">
       <label for="authEmail">E-mail</label>
       <input type="email" id="authEmail" autocomplete="username" placeholder="seu@email.com">
@@ -495,10 +562,17 @@ tr:last-child td{border-bottom:none;}
       <label for="authPassword">Senha</label>
       <input type="password" id="authPassword" autocomplete="current-password">
     </div>
+    <div class="field-row" id="authInviteRow" style="display:none;">
+      <label for="authInvite">Código de convite</label>
+      <input type="password" id="authInvite" autocomplete="off" placeholder="Código fornecido pelo administrador">
+    </div>
     <p id="authError" style="color:var(--stamp-red); font-family:'Inter',sans-serif; font-size:13px; min-height:16px; margin:0 0 12px;"></p>
     <div class="modal-actions">
       <button class="confirm" id="authSubmit" style="width:100%;">Entrar</button>
     </div>
+    <p class="hint-text" style="margin-top:14px;">
+      <a href="#" id="authToggleLink">Tem um código de convite? Criar conta</a>
+    </p>
   </div>
 </div>
 
@@ -1403,6 +1477,58 @@ function renderHistory(){
       requestPasswordThen('delete', btn.dataset.key);
     });
   });
+  renderFullscreen();
+}
+
+function renderFullscreen(){
+  const mk = viewMonth;
+  document.getElementById('fsMonthLabel').textContent = monthLabelOf(mk);
+  const keys = Object.keys(records).filter(k=>monthKeyOf(k)===mk).sort();
+  let totalMins = 0, totalExtraMins = 0;
+  keys.forEach(k=>{
+    const tot = calcTotal(records[k]);
+    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+  });
+  const th = Math.floor(totalMins/60), tm = totalMins%60;
+  document.getElementById('fsMonthTotal').textContent = keys.length
+    ? `${keys.length} dia(s) · total ${th}h${pad(tm)}` + (totalExtraMins>0 ? ` · extra ${formatMinutes(totalExtraMins)}` : '')
+    : 'nenhum registro neste mês';
+
+  const body = document.getElementById('fsBody');
+  if(keys.length===0){
+    body.innerHTML = '<div class="fs-empty">Nenhum registro neste mês.</div>';
+    return;
+  }
+  body.innerHTML = keys.map(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    if(tot && tot.falta){
+      return `<div class="fs-card">
+        <div class="fs-card-date">${displayDate(key)} <span class="fs-card-falta">FALTA</span></div>
+      </div>`;
+    }
+    return `<div class="fs-card">
+      <div class="fs-card-date">${displayDate(key)}</div>
+      <div class="fs-grid">
+        <div><div class="fs-lbl">Entrada</div><div class="fs-val">${rec.entrada||'—'}</div></div>
+        <div><div class="fs-lbl">S. Almoço</div><div class="fs-val">${rec.almocoSaida||'—'}</div></div>
+        <div><div class="fs-lbl">V. Almoço</div><div class="fs-val">${rec.almocoVolta||'—'}</div></div>
+        <div><div class="fs-lbl">Saída</div><div class="fs-val">${rec.saida||'—'}</div></div>
+      </div>
+      <div class="fs-totals">
+        <span>Total: <strong>${tot?tot.text:'—'}${tot && !tot.complete ? ' (parcial)' : ''}</strong></span>
+        ${tot && tot.extraMins>0 ? `<span class="extra">Extra: ${formatMinutes(tot.extraMins)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openFullscreen(){
+  document.getElementById('fullscreenOverlay').classList.add('show');
+  renderFullscreen();
+}
+function closeFullscreen(){
+  document.getElementById('fullscreenOverlay').classList.remove('show');
 }
 
 function tickClock(){
@@ -1476,6 +1602,24 @@ document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
   viewMonth = shiftMonth(viewMonth, 1);
   renderHistory();
 });
+document.getElementById('fullscreenBtn').addEventListener('click', openFullscreen);
+document.getElementById('fsCloseBtn').addEventListener('click', closeFullscreen);
+document.getElementById('fsPrevMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, -1);
+  renderHistory();
+});
+document.getElementById('fsNextMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, 1);
+  renderHistory();
+});
+
+// Código de convite: só quem souber esse código consegue criar uma conta
+// nova pelo próprio app. O código padrão é PONTO2026 — para trocar, gere
+// um novo hash (SHA-256 de "ponto-app::invite::SEU_CODIGO") e substitua
+// o valor abaixo.
+const INVITE_CODE_HASH_RUNTIME = 'ed6897c951589c723ff26a295540194e538f8394de4734ea557317231060886b';
+
+let authMode = 'login'; // 'login' ou 'signup'
 
 function showAuthOverlay(){
   document.getElementById('authOverlay').classList.add('show');
@@ -1484,25 +1628,76 @@ function hideAuthOverlay(){
   document.getElementById('authOverlay').classList.remove('show');
   document.getElementById('authEmail').value = '';
   document.getElementById('authPassword').value = '';
+  document.getElementById('authInvite').value = '';
   document.getElementById('authError').textContent = '';
 }
-async function onLoginSubmit(){
+function setAuthMode(mode){
+  authMode = mode;
+  const title = document.getElementById('authTitle');
+  const hint = document.getElementById('authHint');
+  const inviteRow = document.getElementById('authInviteRow');
+  const submitBtn = document.getElementById('authSubmit');
+  const toggleLink = document.getElementById('authToggleLink');
+  document.getElementById('authError').textContent = '';
+  if(mode === 'signup'){
+    title.textContent = 'Criar conta';
+    hint.textContent = 'Escolha um e-mail e senha e informe o código de convite fornecido pelo administrador.';
+    inviteRow.style.display = 'block';
+    submitBtn.textContent = 'Criar conta';
+    toggleLink.textContent = 'Já tem conta? Entrar';
+  }else{
+    title.textContent = 'Entrar';
+    hint.textContent = 'Acesso restrito. Entre com sua conta.';
+    inviteRow.style.display = 'none';
+    submitBtn.textContent = 'Entrar';
+    toggleLink.textContent = 'Tem um código de convite? Criar conta';
+  }
+}
+async function onAuthSubmit(){
   const email = document.getElementById('authEmail').value.trim();
   const senha = document.getElementById('authPassword').value;
   const errorEl = document.getElementById('authError');
   if(!email || !senha){ errorEl.textContent = 'Preencha e-mail e senha.'; return; }
+  if(senha.length < 6){ errorEl.textContent = 'A senha deve ter pelo menos 6 caracteres.'; return; }
   errorEl.textContent = '';
   const btn = document.getElementById('authSubmit');
   btn.disabled = true;
-  btn.textContent = 'Entrando...';
-  try{
-    await auth.signInWithEmailAndPassword(email, senha);
-    // o resto do carregamento acontece em onAuthStateChanged
-  }catch(e){
-    errorEl.textContent = 'E-mail ou senha incorretos.';
-  }finally{
-    btn.disabled = false;
-    btn.textContent = 'Entrar';
+
+  if(authMode === 'signup'){
+    const invite = document.getElementById('authInvite').value;
+    if(!invite){ errorEl.textContent = 'Informe o código de convite.'; btn.disabled = false; return; }
+    const inviteHash = await hashText('invite::'+invite);
+    if(inviteHash !== INVITE_CODE_HASH_RUNTIME){
+      errorEl.textContent = 'Código de convite incorreto.';
+      btn.disabled = false;
+      return;
+    }
+    btn.textContent = 'Criando conta...';
+    try{
+      await auth.createUserWithEmailAndPassword(email, senha);
+      // onAuthStateChanged cuida do resto
+    }catch(e){
+      if(e.code === 'auth/email-already-in-use'){
+        errorEl.textContent = 'Esse e-mail já tem conta. Tente entrar.';
+      }else if(e.code === 'auth/invalid-email'){
+        errorEl.textContent = 'E-mail inválido.';
+      }else{
+        errorEl.textContent = 'Não foi possível criar a conta.';
+      }
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Criar conta';
+    }
+  }else{
+    btn.textContent = 'Entrando...';
+    try{
+      await auth.signInWithEmailAndPassword(email, senha);
+    }catch(e){
+      errorEl.textContent = 'E-mail ou senha incorretos.';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    }
   }
 }
 async function onLogout(){
@@ -1536,8 +1731,12 @@ async function startApp(){
   }
 }
 
-document.getElementById('authSubmit').addEventListener('click', onLoginSubmit);
-document.getElementById('authPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') onLoginSubmit(); });
+document.getElementById('authSubmit').addEventListener('click', onAuthSubmit);
+document.getElementById('authPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') onAuthSubmit(); });
+document.getElementById('authToggleLink').addEventListener('click', (e)=>{
+  e.preventDefault();
+  setAuthMode(authMode === 'login' ? 'signup' : 'login');
+});
 document.getElementById('logoutBtn').addEventListener('click', onLogout);
 
 auth.onAuthStateChanged((user)=>{
