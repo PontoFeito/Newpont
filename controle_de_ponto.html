@@ -400,13 +400,18 @@ tr:last-child td{border-bottom:none;}
   .punch-status{grid-template-columns:repeat(2,1fr);}
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
     <div class="eyebrow">Cartão de ponto digital</div>
     <h1>Controle de Ponto</h1>
-    <div class="employee-name">Márcio Josoel do Nascimento Gonçalves</div>
+    <div class="employee-name" id="employeeName">—</div>
+    <button class="link-btn" id="editNameLink" style="margin-top:4px;">Editar nome</button>
+    <button class="link-btn" id="logoutBtn" style="margin-top:4px;">Sair</button>
   </div>
 
   <div class="card">
@@ -476,6 +481,42 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- login -->
+<div class="modal-overlay" id="authOverlay" style="z-index:100;">
+  <div class="modal modal-wide">
+    <h3>Entrar</h3>
+    <p class="hint-text">Acesso restrito. As contas são criadas manualmente pelo administrador no Firebase.</p>
+    <div class="field-row">
+      <label for="authEmail">E-mail</label>
+      <input type="email" id="authEmail" autocomplete="username" placeholder="seu@email.com">
+    </div>
+    <div class="field-row">
+      <label for="authPassword">Senha</label>
+      <input type="password" id="authPassword" autocomplete="current-password">
+    </div>
+    <p id="authError" style="color:var(--stamp-red); font-family:'Inter',sans-serif; font-size:13px; min-height:16px; margin:0 0 12px;"></p>
+    <div class="modal-actions">
+      <button class="confirm" id="authSubmit" style="width:100%;">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- nome do usuário -->
+<div class="modal-overlay" id="nameOverlay">
+  <div class="modal modal-wide">
+    <h3>Seu nome</h3>
+    <p class="hint-text">Como você quer que seu nome apareça no cartão de ponto e nas exportações.</p>
+    <div class="field-row">
+      <label for="nameInput">Nome</label>
+      <input type="text" id="nameInput" autocomplete="off" placeholder="Ex.: Ana Souza">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="nameCancel">Cancelar</button>
+      <button class="confirm" id="nameSave">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- confirmação genérica (excluir dia, substituir batida) -->
 <div class="modal-overlay" id="modalOverlay">
@@ -629,14 +670,30 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <script>
+// --- Firebase: autenticação por e-mail/senha + Firestore como banco único ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA_hyosRTkvlk8_Qj-V9k0-2fiy1b9MYVM",
+  authDomain: "controle-ponto-7a04d.firebaseapp.com",
+  projectId: "controle-ponto-7a04d",
+  storageBucket: "controle-ponto-7a04d.firebasestorage.app",
+  messagingSenderId: "458473922894",
+  appId: "1:458473922894:web:f72ee3fa6f017af660fe1f",
+  measurementId: "G-F7VQSSTHNN"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
 const STORAGE_KEY = 'ponto-records';
 const SECURITY_KEY = 'ponto-security';
 const PAYROLL_KEY = 'ponto-payroll';
+const PROFILE_KEY = 'ponto-perfil';
 const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
 const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
 let records = {};
 let security = null; // {passwordHash, question, answerHash}
 let payroll = null; // {salario, va, vc} — dias úteis são calculados automaticamente pelo calendário
+let profile = null; // {nome}
 let viewMonth = null; // 'YYYY-MM'
 let pendingAction = null; // 'edit' | 'changePassword'
 let pendingEditDate = null;
@@ -770,28 +827,36 @@ async function verifyBiometric(){
   }
 }
 
-// --- camada de armazenamento: usa a nuvem do Claude quando disponível,
-// e cai para o armazenamento do próprio aparelho (localStorage) quando o
-// app roda fora do Claude (instalado como PWA/APK no celular). Mesmas
-// chaves nos dois casos, para nunca perder os dados já registrados.
-function hasCloudStorage(){
-  return typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+// --- camada de armazenamento: cada usuário logado tem sua própria coleção
+// no Firestore (users/{uid}/appdata/{chave}), então os dados ficam num
+// lugar só na nuvem e sincronizam em qualquer aparelho que fizer login.
+function currentUid(){
+  return auth.currentUser ? auth.currentUser.uid : null;
 }
 async function storageGet(key){
-  if(hasCloudStorage()){
-    try{ return await window.storage.get(key, false); }catch(e){ /* cai para local */ }
+  const uid = currentUid();
+  if(!uid) return null;
+  try{
+    const snap = await db.collection('users').doc(uid).collection('appdata').doc(key).get();
+    if(!snap.exists) return null;
+    const data = snap.data();
+    return {value: data.value};
+  }catch(e){
+    console.error('storageGet', e);
+    return null;
   }
-  const raw = localStorage.getItem(key);
-  return raw !== null ? {value: raw} : null;
 }
 async function storageSet(key, value){
-  if(hasCloudStorage()){
-    try{ await window.storage.set(key, value, false); return true; }catch(e){ /* cai para local */ }
-  }
+  const uid = currentUid();
+  if(!uid) return false;
   try{
-    localStorage.setItem(key, value);
+    await db.collection('users').doc(uid).collection('appdata').doc(key).set({
+      value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     return true;
   }catch(e){
+    console.error('storageSet', e);
     return false;
   }
 }
@@ -833,6 +898,38 @@ async function savePayroll(p){
   payroll = p;
   const ok = await storageSet(PAYROLL_KEY, JSON.stringify(p));
   if(!ok) showToast('Não foi possível salvar os dados de remuneração.');
+}
+async function loadProfile(){
+  try{
+    const res = await storageGet(PROFILE_KEY);
+    profile = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    profile = null;
+  }
+}
+async function saveProfile(p){
+  profile = p;
+  const ok = await storageSet(PROFILE_KEY, JSON.stringify(p));
+  if(!ok) showToast('Não foi possível salvar o nome.');
+}
+
+function openNamePrompt(){
+  document.getElementById('nameInput').value = profile ? profile.nome : '';
+  document.getElementById('nameOverlay').classList.add('show');
+}
+function closeNamePrompt(){
+  document.getElementById('nameOverlay').classList.remove('show');
+}
+function renderProfile(){
+  document.getElementById('employeeName').textContent = profile && profile.nome ? profile.nome : 'Sem nome definido';
+}
+async function onNameSave(){
+  const nome = document.getElementById('nameInput').value.trim();
+  if(!nome){ showToast('Digite um nome.'); return; }
+  await saveProfile({nome});
+  renderProfile();
+  closeNamePrompt();
+  showToast('Nome salvo.');
 }
 
 function showToast(msg){
@@ -1315,7 +1412,7 @@ function tickClock(){
 function exportCSV(){
   const keys = Object.keys(records).sort();
   if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
-  let csv = 'Funcionario;Márcio Josoel do Nascimento Gonçalves\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
+  let csv = 'Funcionario;' + (profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
   keys.forEach(key=>{
     const rec = records[key];
     const tot = calcTotal(rec);
@@ -1339,6 +1436,9 @@ function exportCSV(){
 document.getElementById('punchBtn').addEventListener('click', handlePunch);
 document.getElementById('editManualBtn').addEventListener('click', ()=>requestPasswordThen('edit', todayKey()));
 document.getElementById('securityBtn').addEventListener('click', ()=>requestPasswordThen('changePassword'));
+document.getElementById('editNameLink').addEventListener('click', openNamePrompt);
+document.getElementById('nameCancel').addEventListener('click', closeNamePrompt);
+document.getElementById('nameSave').addEventListener('click', onNameSave);
 
 document.getElementById('passwordConfirm').addEventListener('click', onPasswordConfirm);
 document.getElementById('passwordCancel').addEventListener('click', closePasswordPrompt);
@@ -1377,15 +1477,55 @@ document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
   renderHistory();
 });
 
-(async function init(){
+function showAuthOverlay(){
+  document.getElementById('authOverlay').classList.add('show');
+}
+function hideAuthOverlay(){
+  document.getElementById('authOverlay').classList.remove('show');
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authError').textContent = '';
+}
+async function onLoginSubmit(){
+  const email = document.getElementById('authEmail').value.trim();
+  const senha = document.getElementById('authPassword').value;
+  const errorEl = document.getElementById('authError');
+  if(!email || !senha){ errorEl.textContent = 'Preencha e-mail e senha.'; return; }
+  errorEl.textContent = '';
+  const btn = document.getElementById('authSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  try{
+    await auth.signInWithEmailAndPassword(email, senha);
+    // o resto do carregamento acontece em onAuthStateChanged
+  }catch(e){
+    errorEl.textContent = 'E-mail ou senha incorretos.';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+}
+async function onLogout(){
+  await auth.signOut();
+}
+
+let appStarted = false;
+async function startApp(){
+  if(appStarted) return;
+  appStarted = true;
   viewMonth = todayKey().slice(0,7);
   await loadRecords();
   await loadSecurity();
   await loadPayroll();
+  await loadProfile();
+  renderProfile();
   renderToday();
   renderHistory();
   tickClock();
   setInterval(tickClock, 1000);
+  if(!profile){
+    openNamePrompt();
+  }
   if(!payroll){
     openPayrollSetup();
   }else{
@@ -1394,7 +1534,22 @@ document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
   if('serviceWorker' in navigator){
     try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ /* opcional */ }
   }
-})();
+}
+
+document.getElementById('authSubmit').addEventListener('click', onLoginSubmit);
+document.getElementById('authPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') onLoginSubmit(); });
+document.getElementById('logoutBtn').addEventListener('click', onLogout);
+
+auth.onAuthStateChanged((user)=>{
+  if(user){
+    hideAuthOverlay();
+    startApp();
+  }else{
+    appStarted = false;
+    records = {}; security = null; payroll = null; profile = null;
+    showAuthOverlay();
+  }
+});
 </script>
 </body>
 </html>
