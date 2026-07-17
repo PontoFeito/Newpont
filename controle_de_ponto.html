@@ -922,6 +922,7 @@ async function verifyBiometric(){
 // --- camada de armazenamento: cada usuário logado tem sua própria coleção
 // no Firestore (users/{uid}/appdata/{chave}), então os dados ficam num
 // lugar só na nuvem e sincronizam em qualquer aparelho que fizer login.
+let lastStorageError = null;
 function currentUid(){
   return auth.currentUser ? auth.currentUser.uid : null;
 }
@@ -935,12 +936,13 @@ async function storageGet(key){
     return {value: data.value};
   }catch(e){
     console.error('storageGet', e);
+    lastStorageError = (e.code || e.message || 'erro desconhecido');
     return null;
   }
 }
 async function storageSet(key, value){
   const uid = currentUid();
-  if(!uid) return false;
+  if(!uid){ lastStorageError = 'sem usuário logado'; return false; }
   try{
     await db.collection('users').doc(uid).collection('appdata').doc(key).set({
       value,
@@ -949,6 +951,7 @@ async function storageSet(key, value){
     return true;
   }catch(e){
     console.error('storageSet', e);
+    lastStorageError = (e.code || e.message || 'erro desconhecido');
     return false;
   }
 }
@@ -963,7 +966,8 @@ async function loadRecords(){
 }
 async function saveRecords(){
   const ok = await storageSet(STORAGE_KEY, JSON.stringify(records));
-  if(!ok) showToast('Não foi possível salvar. Tente novamente.');
+  if(!ok) showToast('Não foi possível salvar (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  return ok;
 }
 async function loadSecurity(){
   try{
@@ -974,9 +978,13 @@ async function loadSecurity(){
   }
 }
 async function saveSecurity(sec){
-  security = sec;
   const ok = await storageSet(SECURITY_KEY, JSON.stringify(sec));
-  if(!ok) showToast('Não foi possível salvar a senha. Tente novamente.');
+  if(ok){
+    security = sec;
+  }else{
+    showToast('Não foi possível salvar a senha (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
 }
 async function loadPayroll(){
   try{
@@ -987,9 +995,13 @@ async function loadPayroll(){
   }
 }
 async function savePayroll(p){
-  payroll = p;
   const ok = await storageSet(PAYROLL_KEY, JSON.stringify(p));
-  if(!ok) showToast('Não foi possível salvar os dados de remuneração.');
+  if(ok){
+    payroll = p;
+  }else{
+    showToast('Não foi possível salvar os dados de remuneração (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
 }
 async function loadProfile(){
   try{
@@ -1000,9 +1012,13 @@ async function loadProfile(){
   }
 }
 async function saveProfile(p){
-  profile = p;
   const ok = await storageSet(PROFILE_KEY, JSON.stringify(p));
-  if(!ok) showToast('Não foi possível salvar o nome.');
+  if(ok){
+    profile = p;
+  }else{
+    showToast('Não foi possível salvar o nome (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
 }
 
 function openNamePrompt(){
@@ -1018,18 +1034,19 @@ function renderProfile(){
 async function onNameSave(){
   const nome = document.getElementById('nameInput').value.trim();
   if(!nome){ showToast('Digite um nome.'); return; }
-  await saveProfile({nome});
+  const ok = await saveProfile({nome});
+  if(!ok) return;
   renderProfile();
   closeNamePrompt();
   showToast('Nome salvo.');
 }
 
-function showToast(msg){
+function showToast(msg, duration){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(showToast._tm);
-  showToast._tm = setTimeout(()=>t.classList.remove('show'), 2200);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), duration || 2200);
 }
 
 function askConfirm(text){
@@ -1062,15 +1079,22 @@ function nextPendingTipo(rec){
 
 async function registrar(tipo){
   const key = todayKey();
+  const backup = records[key] ? {...records[key]} : null;
   if(!records[key]){
     records[key] = {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
   }
   const rec = records[key];
-  rec[tipo] = nowTime();
-  await saveRecords();
+  const horario = nowTime();
+  rec[tipo] = horario;
+  const ok = await saveRecords();
+  if(!ok){
+    // desfaz a alteração local já que não foi salva de verdade
+    if(backup){ records[key] = backup; } else { delete records[key]; }
+    return;
+  }
   renderToday();
   renderHistory();
-  showToast(`${LABELS[tipo]} registrada às ${rec[tipo]}`);
+  showToast(`${LABELS[tipo]} registrada às ${horario}`);
 }
 
 async function handlePunch(){
@@ -1225,8 +1249,10 @@ function proceedPendingAction(){
 async function confirmDelete(key){
   const ok = await askConfirm(`Excluir todos os registros de ${displayDateShort(key)}?`);
   if(!ok) return;
+  const backup = records[key];
   delete records[key];
-  await saveRecords();
+  const saved = await saveRecords();
+  if(!saved){ records[key] = backup; return; }
   renderToday();
   renderHistory();
 }
@@ -1279,7 +1305,8 @@ async function onSetupSave(){
     }
   }
 
-  await saveSecurity({passwordHash, question, answerHash, biometricEnabled, biometricCredentialId});
+  const ok = await saveSecurity({passwordHash, question, answerHash, biometricEnabled, biometricCredentialId});
+  if(!ok) return;
   closeSetup();
   showToast('Senha salva com sucesso.');
   if(pendingAction === 'edit' || pendingAction === 'delete'){
@@ -1338,7 +1365,8 @@ async function saveManualEdit(){
     TIPOS.forEach(t=>{ rec[t] = vals[t] ? vals[t]+':00' : null; });
     records[key] = rec;
   }
-  await saveRecords();
+  const ok = await saveRecords();
+  if(!ok) return;
   renderToday();
   renderHistory();
   closeEditModal();
@@ -1360,7 +1388,8 @@ async function onPayrollSetupSave(){
   const va = parseFloat(document.getElementById('pVA').value) || 0;
   const vc = parseFloat(document.getElementById('pVC').value) || 0;
   if(!salario || salario<=0){ showToast('Informe um salário válido.'); return; }
-  await savePayroll({salario, va, vc});
+  const ok = await savePayroll({salario, va, vc});
+  if(!ok) return;
   closePayrollSetup();
   showToast('Dados de remuneração salvos.');
   openPayrollSummary();
