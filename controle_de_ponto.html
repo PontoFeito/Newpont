@@ -432,7 +432,47 @@ tr:last-child td{border-bottom:none;}
         <button class="edit-btn" id="editManualBtn">✎ Editar horários (protegido por senha)</button>
         <button class="security-btn" id="securityBtn">🔒 Alterar senha</button>
       </div>
+<div class="punch-status" id="punchStatus">
+    <div class="stamp-item" data-tipo="entrada">
+        <span class="stamp-label">Entrada</span>
+        <span class="stamp-time">—</span>
+    </div>
 
+    <div class="stamp-item" data-tipo="almocoSaida">
+        <span class="stamp-label">Saída Almoço</span>
+        <span class="stamp-time">—</span>
+    </div>
+
+    <div class="stamp-item" data-tipo="almocoVolta">
+        <span class="stamp-label">Volta Almoço</span>
+        <span class="stamp-time">—</span>
+    </div>
+
+    <div class="stamp-item" data-tipo="saida">
+        <span class="stamp-label">Saída</span>
+        <span class="stamp-time">—</span>
+    </div>
+</div>
+
+<button class="btn-main" id="punchBtn">
+    Bater Ponto
+    <span class="sub" id="punchBtnSub"></span>
+</button>
+
+<div class="btn-row">
+    <button class="edit-btn" id="editManualBtn">
+        ✎ Editar horários (protegido por senha)
+    </button>
+
+    <button class="security-btn" id="securityBtn">
+        🔒 Alterar senha
+    </button>
+</div>
+
+<div class="summary">
+    <span class="tot-label">Total trabalhado hoje</span>
+    <span class="tot-value" id="totalHoje">—</span>
+</div>
       <div class="summary">
         <span class="tot-label">Total trabalhado hoje</span>
         <span class="tot-value" id="totalHoje">—</span>
