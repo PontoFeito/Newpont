@@ -540,6 +540,12 @@ tr:last-child td{border-bottom:none;}
         <button class="drawer-item" id="menuExportA4Btn"><span class="ic">📄</span> Exportar folha A4 (imprimir/PDF)</button>
         <button class="drawer-item" id="menuExportExcelBtn"><span class="ic">📊</span> Exportar Excel</button>
       </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Importar</div>
+        <button class="drawer-item" id="menuImportCsvBtn"><span class="ic">📥</span> Importar pontos antigos (CSV)</button>
+        <input type="file" id="importCsvInput" accept=".csv,text/csv" style="display:none;">
+      </div>
     </div>
     <div class="drawer-footer">
       <button class="drawer-item" id="menuLogoutBtn"><span class="ic">🚪</span> Sair</button>
@@ -858,11 +864,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-// Algumas redes (operadoras, apps de economia de dados, proxies) cortam o
-// jeito padrão do Firestore de manter conexão aberta com o servidor. Forçamos
-// aqui o modo de "long polling" (mais parecido com pedidos HTTP normais),
-// que passa por esse tipo de bloqueio bem mais confiável que o modo padrão.
-db.settings({ experimentalForceLongPolling: true, merge: true });
 
 const STORAGE_KEY = 'ponto-records';
 const SECURITY_KEY = 'ponto-security';
@@ -1023,23 +1024,37 @@ function withTimeout(promise, ms){
     new Promise(resolve=>setTimeout(()=>resolve({v:null, timedOut:true}), ms))
   ]);
 }
+// Usamos a API REST do Firestore (pedidos HTTP comuns) em vez do canal
+// "sempre aberto" do SDK, porque esse canal especial vem travando em
+// algumas redes/aparelhos sem nunca dar erro. Pedidos HTTP comuns são o
+// mesmo tipo de conexão usada para abrir qualquer página — muito mais
+// compatível.
+const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+
 async function storageGet(key){
   const uid = currentUid();
   if(!uid) return null;
   try{
-    const {v:snap, timedOut} = await withTimeout(
-      db.collection('users').doc(uid).collection('appdata').doc(key).get(), 12000
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}`;
+    const {v:res, timedOut} = await withTimeout(
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } }), 12000
     );
     if(timedOut){
       lastStorageError = 'tempo esgotado — verifique sua internet';
       return null;
     }
-    if(!snap.exists) return null;
-    const data = snap.data();
-    return {value: data.value};
+    if(res.status === 404) return null;
+    if(!res.ok){
+      lastStorageError = 'http ' + res.status;
+      return null;
+    }
+    const data = await res.json();
+    const value = data.fields && data.fields.value && data.fields.value.stringValue;
+    return value !== undefined ? {value} : null;
   }catch(e){
     console.error('storageGet', e);
-    lastStorageError = (e.code || e.message || 'erro desconhecido');
+    lastStorageError = (e.message || 'erro desconhecido');
     return null;
   }
 }
@@ -1047,19 +1062,33 @@ async function storageSet(key, value){
   const uid = currentUid();
   if(!uid){ lastStorageError = 'sem usuário logado'; return false; }
   try{
-    const writePromise = db.collection('users').doc(uid).collection('appdata').doc(key).set({
-      value,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    const {timedOut} = await withTimeout(writePromise, 12000);
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}?updateMask.fieldPaths=value&updateMask.fieldPaths=updatedAt`;
+    const body = {
+      fields: {
+        value: { stringValue: value },
+        updatedAt: { timestampValue: new Date().toISOString() }
+      }
+    };
+    const {v:res, timedOut} = await withTimeout(
+      fetch(url, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }), 12000
+    );
     if(timedOut){
       lastStorageError = 'tempo esgotado — verifique sua internet';
+      return false;
+    }
+    if(!res.ok){
+      lastStorageError = 'http ' + res.status;
       return false;
     }
     return true;
   }catch(e){
     console.error('storageSet', e);
-    lastStorageError = (e.code || e.message || 'erro desconhecido');
+    lastStorageError = (e.message || 'erro desconhecido');
     return false;
   }
 }
@@ -1857,6 +1886,65 @@ function exportExcel(){
   URL.revokeObjectURL(url);
 }
 
+// Lê o mesmo formato de CSV que o app exporta (Data;Entrada;Saida Almoco;
+// Volta Almoco;Saida;Total;Hora Extra;Falta) e junta com os dias que já
+// existem, sem apagar nada que já está salvo.
+function parseCSVLine(line){
+  return line.split(';').map(c=>c.trim());
+}
+async function importCSVFile(file){
+  let text;
+  try{
+    text = await file.text();
+  }catch(e){
+    showToast('Não foi possível ler o arquivo.', 4000);
+    return;
+  }
+  const cleanText = text.replace(/^\uFEFF/, '');
+  const lines = cleanText.split(/\r?\n/).filter(l=>l.trim().length>0);
+  const headerIdx = lines.findIndex(l=>l.trim().toLowerCase().startsWith('data;'));
+  if(headerIdx === -1){
+    showToast('Não reconheci o formato desse CSV. Use um arquivo exportado pelo próprio app.', 5000);
+    return;
+  }
+  let imported = 0, skipped = 0;
+  for(let i=headerIdx+1; i<lines.length; i++){
+    const cols = parseCSVLine(lines[i]);
+    if(cols.length < 5){ skipped++; continue; }
+    const [dataStr, entrada, almocoSaida, almocoVolta, saida, , , falta] = cols;
+    const m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m){ skipped++; continue; }
+    const key = `${m[3]}-${m[2]}-${m[1]}`;
+    if(falta && falta.trim().toUpperCase()==='SIM'){
+      records[key] = {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:true};
+    }else{
+      const norm = (t)=>{
+        if(!t) return null;
+        const tt = t.trim();
+        if(!tt) return null;
+        return tt.length===5 ? tt+':00' : tt;
+      };
+      records[key] = {
+        entrada: norm(entrada),
+        almocoSaida: norm(almocoSaida),
+        almocoVolta: norm(almocoVolta),
+        saida: norm(saida),
+        falta: false
+      };
+    }
+    imported++;
+  }
+  if(imported===0){
+    showToast('Nenhum registro válido encontrado no arquivo.', 4000);
+    return;
+  }
+  const ok = await saveRecords();
+  if(!ok) return;
+  renderToday();
+  renderHistory();
+  showToast(`${imported} dia(s) importado(s)` + (skipped ? `, ${skipped} linha(s) ignorada(s).` : '.'), 4000);
+}
+
 function exportCSV(){
   const keys = Object.keys(records).sort();
   if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
@@ -1913,6 +2001,13 @@ on('menuPasswordBtn', 'click', ()=>{ closeDrawer(); requestPasswordThen('changeP
 on('menuPayrollSetupBtn', 'click', ()=>{ closeDrawer(); openPayrollSetup(); });
 on('menuPayrollSummaryBtn', 'click', ()=>{ closeDrawer(); openPayrollSummary(); });
 on('menuExportCsvBtn', 'click', ()=>{ closeDrawer(); exportCSV(); });
+on('menuImportCsvBtn', 'click', ()=>{ closeDrawer(); document.getElementById('importCsvInput').click(); });
+on('importCsvInput', 'change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  await importCSVFile(file);
+});
 on('menuExportA4Btn', 'click', ()=>{ closeDrawer(); exportA4(); });
 on('menuExportExcelBtn', 'click', ()=>{ closeDrawer(); exportExcel(); });
 on('menuLogoutBtn', 'click', ()=>{ closeDrawer(); onLogout(); });
@@ -2110,15 +2205,14 @@ async function startApp(){
   if(appStarted) return;
   appStarted = true;
   viewMonth = todayKey().slice(0,7);
-  await loadRecords();
-  await loadSecurity();
-  await loadPayroll();
-  await loadProfile();
+  // O relógio e a data de hoje não dependem de nada salvo — aparecem na hora,
+  // mesmo que o carregamento dos dados esteja demorando ou falhando.
+  tickClock();
+  setInterval(tickClock, 1000);
+  await Promise.all([loadRecords(), loadSecurity(), loadPayroll(), loadProfile()]);
   renderProfile();
   renderToday();
   renderHistory();
-  tickClock();
-  setInterval(tickClock, 1000);
   if(!profile){
     openNamePrompt();
   }
