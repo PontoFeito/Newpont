@@ -1046,7 +1046,9 @@ async function storageGet(key){
     }
     if(res.status === 404) return null;
     if(!res.ok){
-      lastStorageError = 'http ' + res.status;
+      let detail = '';
+      try{ const errBody = await res.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
+      lastStorageError = 'http ' + res.status + detail;
       return null;
     }
     const data = await res.json();
@@ -1063,7 +1065,7 @@ async function storageSet(key, value){
   if(!uid){ lastStorageError = 'sem usuário logado'; return false; }
   try{
     const token = await auth.currentUser.getIdToken();
-    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}?updateMask.fieldPaths=value&updateMask.fieldPaths=updatedAt`;
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}`;
     const body = {
       fields: {
         value: { stringValue: value },
@@ -1082,7 +1084,9 @@ async function storageSet(key, value){
       return false;
     }
     if(!res.ok){
-      lastStorageError = 'http ' + res.status;
+      let detail = '';
+      try{ const errBody = await res.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
+      lastStorageError = 'http ' + res.status + detail;
       return false;
     }
     return true;
