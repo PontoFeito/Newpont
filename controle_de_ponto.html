@@ -858,11 +858,11 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-// Algumas redes (operadoras, apps de economia de dados, DNS privado) bloqueiam
-// o jeito padrão do Firestore de manter conexão aberta com o servidor. Isso
-// faz o SDK detectar sozinho e usar um modo mais compatível quando precisar,
-// evitando pedidos que ficam pendurados sem nunca dar erro nem sucesso.
-db.settings({ experimentalAutoDetectLongPolling: true, merge: true });
+// Algumas redes (operadoras, apps de economia de dados, proxies) cortam o
+// jeito padrão do Firestore de manter conexão aberta com o servidor. Forçamos
+// aqui o modo de "long polling" (mais parecido com pedidos HTTP normais),
+// que passa por esse tipo de bloqueio bem mais confiável que o modo padrão.
+db.settings({ experimentalForceLongPolling: true, merge: true });
 
 const STORAGE_KEY = 'ponto-records';
 const SECURITY_KEY = 'ponto-security';
