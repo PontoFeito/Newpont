@@ -1029,7 +1029,7 @@ function withTimeout(promise, ms){
 // algumas redes/aparelhos sem nunca dar erro. Pedidos HTTP comuns são o
 // mesmo tipo de conexão usada para abrir qualquer página — muito mais
 // compatível.
-const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/default/documents`;
 
 async function storageGet(key){
   const uid = currentUid();
