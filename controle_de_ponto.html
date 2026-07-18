@@ -1009,11 +1009,26 @@ let lastStorageError = null;
 function currentUid(){
   return auth.currentUser ? auth.currentUser.uid : null;
 }
+// Se o Firebase não responder em 12s (sem internet, rede instável, etc.),
+// desistimos e avisamos, em vez de deixar a tela travada esperando pra sempre.
+function withTimeout(promise, ms){
+  const TIMED_OUT = Symbol('timeout');
+  return Promise.race([
+    promise.then(v=>({v, timedOut:false})),
+    new Promise(resolve=>setTimeout(()=>resolve({v:null, timedOut:true}), ms))
+  ]);
+}
 async function storageGet(key){
   const uid = currentUid();
   if(!uid) return null;
   try{
-    const snap = await db.collection('users').doc(uid).collection('appdata').doc(key).get();
+    const {v:snap, timedOut} = await withTimeout(
+      db.collection('users').doc(uid).collection('appdata').doc(key).get(), 12000
+    );
+    if(timedOut){
+      lastStorageError = 'tempo esgotado — verifique sua internet';
+      return null;
+    }
     if(!snap.exists) return null;
     const data = snap.data();
     return {value: data.value};
@@ -1027,10 +1042,15 @@ async function storageSet(key, value){
   const uid = currentUid();
   if(!uid){ lastStorageError = 'sem usuário logado'; return false; }
   try{
-    await db.collection('users').doc(uid).collection('appdata').doc(key).set({
+    const writePromise = db.collection('users').doc(uid).collection('appdata').doc(key).set({
       value,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    const {timedOut} = await withTimeout(writePromise, 12000);
+    if(timedOut){
+      lastStorageError = 'tempo esgotado — verifique sua internet';
+      return false;
+    }
     return true;
   }catch(e){
     console.error('storageSet', e);
@@ -1117,7 +1137,12 @@ function renderProfile(){
 async function onNameSave(){
   const nome = document.getElementById('nameInput').value.trim();
   if(!nome){ showToast('Digite um nome.'); return; }
+  const btn = document.getElementById('nameSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
   const ok = await saveProfile({nome});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
   if(!ok) return;
   renderProfile();
   closeNamePrompt();
@@ -1408,6 +1433,9 @@ async function onSetupSave(){
   if(!p1 || p1.length < 4){ showToast('A senha deve ter pelo menos 4 caracteres.'); return; }
   if(p1 !== p2){ showToast('As senhas não coincidem.'); return; }
   if(!question || !answer){ showToast('Preencha a pergunta e a resposta de segurança.'); return; }
+  const btn = document.getElementById('setupSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
   const passwordHash = await hashText(p1);
   const answerHash = await hashText(answer.toLowerCase());
 
@@ -1425,6 +1453,8 @@ async function onSetupSave(){
   }
 
   const ok = await saveSecurity({passwordHash, question, answerHash, biometricEnabled, biometricCredentialId});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
   if(!ok) return;
   closeSetup();
   showToast('Senha salva com sucesso.');
@@ -1484,7 +1514,12 @@ async function saveManualEdit(){
     TIPOS.forEach(t=>{ rec[t] = vals[t] ? vals[t]+':00' : null; });
     records[key] = rec;
   }
+  const btn = document.getElementById('editSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
   const ok = await saveRecords();
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
   if(!ok) return;
   renderToday();
   renderHistory();
@@ -1507,7 +1542,12 @@ async function onPayrollSetupSave(){
   const va = parseFloat(document.getElementById('pVA').value) || 0;
   const vc = parseFloat(document.getElementById('pVC').value) || 0;
   if(!salario || salario<=0){ showToast('Informe um salário válido.'); return; }
+  const btn = document.getElementById('payrollSetupSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
   const ok = await savePayroll({salario, va, vc});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
   if(!ok) return;
   closePayrollSetup();
   showToast('Dados de remuneração salvos.');
