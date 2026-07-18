@@ -42,12 +42,76 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
 .month-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
 .month-nav button{border:1px solid var(--ink); background:#fff; border-radius:3px; padding:4px 12px; cursor:pointer;}
 .back-link{cursor:pointer; color:var(--muted); font-family:'Space Mono',monospace; font-size:12px; text-decoration:underline;}
+
+.header-row{display:flex; align-items:center; gap:14px; margin-bottom:22px; border-bottom:2px solid var(--ink); padding-bottom:16px;}
+.menu-btn{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:40px; height:40px; font-size:18px; cursor:pointer; flex-shrink:0;
+}
+.drawer-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:none; z-index:90;
+}
+.drawer-overlay.show{display:block;}
+.drawer{
+  position:fixed; top:0; left:0; bottom:0; width:88%; max-width:320px;
+  background:#F2F2F2; border-right:2px solid var(--ink);
+  display:flex; flex-direction:column;
+  transform:translateX(-100%); transition:transform 0.2s ease;
+}
+.drawer-overlay.show .drawer{transform:translateX(0);}
+.drawer-header{
+  padding:18px 16px; border-bottom:2px solid var(--ink); background:#fff;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.drawer-header h2{margin:0; font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase;}
+.drawer-close{border:1.5px solid var(--ink); background:#fff; border-radius:4px; width:32px; height:32px; font-size:16px; cursor:pointer;}
+.drawer-body{flex:1; overflow-y:auto; padding:8px 0;}
+.drawer-account{padding:14px 16px; border-bottom:1px solid var(--line); background:#fff;}
+.drawer-account .acc-label{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--muted); letter-spacing:1px;}
+.drawer-account .acc-value{font-family:'Inter',sans-serif; font-size:14px; font-weight:600; word-break:break-all;}
+.drawer-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:12px 16px; border:none; background:none; text-align:left;
+  font-family:'Inter',sans-serif; font-size:14.5px; color:var(--ink);
+  cursor:pointer;
+}
+.drawer-item:active{background:#e2e2e2;}
+.drawer-item .ic{width:20px; text-align:center; flex-shrink:0;}
+.drawer-item.danger{color:var(--stamp-red);}
+.drawer-footer{border-top:2px solid var(--ink); padding:8px; background:#fff;}
 </style>
 </head>
 <body>
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-header">
+      <h2>Menu</h2>
+      <button class="drawer-close" id="drawerCloseBtn" aria-label="Fechar menu">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-account">
+        <div class="acc-label">Conta ADM</div>
+        <div class="acc-value" id="drawerAccountEmail">—</div>
+      </div>
+      <button class="drawer-item" id="menuGoSolicitacoes"><span class="ic">⏳</span> Solicitações de ajuste</button>
+      <button class="drawer-item" id="menuGoCreate"><span class="ic">➕</span> Adicionar funcionário</button>
+      <button class="drawer-item" id="menuGoList"><span class="ic">👥</span> Funcionários</button>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-item danger" id="menuLogoutBtn"><span class="ic">🚪</span> Sair</button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap">
-  <div class="eyebrow">Controle de Ponto</div>
-  <h1>Painel administrativo</h1>
+  <div class="header-row">
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+    <div>
+      <div class="eyebrow">Controle de Ponto</div>
+      <h1 style="margin:0; border:none; padding:0;">Painel administrativo</h1>
+    </div>
+  </div>
 
   <!-- login -->
   <div class="card" id="loginCard">
@@ -69,8 +133,11 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
   <div id="appArea" class="hidden">
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <strong id="adminEmailLabel"></strong>
-        <button class="btn outline small" id="logoutBtn">Sair</button>
+        <div>
+          <strong id="adminEmailLabel"></strong>
+          <div id="adminUidLabel" style="font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); margin-top:2px;"></div>
+        </div>
+        <button class="btn outline small" id="logoutBtnOld" style="display:none;">Sair</button>
       </div>
     </div>
 
@@ -444,7 +511,8 @@ async function loadEmployees(){
   const token = await authToken();
   const res = await fetch(`${FIRESTORE_REST_BASE}/employees`, { headers:{ Authorization:`Bearer ${token}` } });
   if(res.status === 403){
-    document.getElementById('employeesTableWrap').innerHTML = '<p class="error-text">Esta conta não tem permissão de ADM (verifique o UID nas regras do Firestore).</p>';
+    const uid = auth.currentUser ? auth.currentUser.uid : '—';
+    document.getElementById('employeesTableWrap').innerHTML = `<p class="error-text">Esta conta não tem permissão de ADM.<br>Crie no Firestore o documento <b>admins/${uid}</b> (esse é o UID desta conta logada agora) e entre de novo.</p>`;
     return;
   }
   if(!res.ok){
@@ -659,6 +727,7 @@ auth.onAuthStateChanged(async (user)=>{
     document.getElementById('loginCard').classList.add('hidden');
     document.getElementById('appArea').classList.remove('hidden');
     document.getElementById('adminEmailLabel').textContent = user.email;
+    document.getElementById('adminUidLabel').textContent = 'UID: ' + user.uid;
     document.getElementById('employeesTableWrap').innerHTML = 'Carregando…';
     if(window.Notification && Notification.permission === 'default'){
       Notification.requestPermission();
@@ -681,7 +750,21 @@ auth.onAuthStateChanged(async (user)=>{
 
 on('loginBtn','click', onLogin);
 on('toggleCreateBtn','click', ()=>setCreateMode(!createMode));
-on('logoutBtn','click', onLogout);
+on('menuBtn','click', ()=>{
+  document.getElementById('drawerAccountEmail').textContent = auth.currentUser ? auth.currentUser.email : '—';
+  document.getElementById('drawerOverlay').classList.add('show');
+});
+on('drawerCloseBtn','click', ()=>document.getElementById('drawerOverlay').classList.remove('show'));
+on('drawerOverlay','click', (e)=>{ if(e.target.id==='drawerOverlay') document.getElementById('drawerOverlay').classList.remove('show'); });
+on('menuLogoutBtn','click', ()=>{ document.getElementById('drawerOverlay').classList.remove('show'); onLogout(); });
+function scrollToCard(id){
+  document.getElementById('drawerOverlay').classList.remove('show');
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+on('menuGoSolicitacoes','click', ()=>scrollToCard('solicitacoesCard'));
+on('menuGoCreate','click', ()=>scrollToCard('createCard'));
+on('menuGoList','click', ()=>scrollToCard('listCard'));
 on('newTipoId','change', toggleNewIdType);
 on('gerarSenhaBtn','click', ()=>{ document.getElementById('newSenha').value = gerarSenhaAleatoria(); });
 on('criarFuncionarioBtn','click', criarFuncionario);
