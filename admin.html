@@ -763,6 +763,19 @@ async function runDiagnostico(){
     linhas.push('2) erro de rede: ' + e.message);
   }
 
+  linhas.push('');
+
+  // 3) Ler UM funcionário específico direto pelo UID dele (não a lista
+  // inteira) — isola se o problema é só no "listar" ou em tudo.
+  try{
+    const r3 = await fetch(`${FIRESTORE_REST_BASE}/employees/AkHK7r6dTxPNAZiScTWt9Jd647H3`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t3 = await r3.text();
+    linhas.push(`3) GET /employees/AkHK7r6dTxPNAZiScTWt9Jd647H3 (doc único) -> HTTP ${r3.status}`);
+    linhas.push(t3.slice(0, 300));
+  }catch(e){
+    linhas.push('3) erro de rede: ' + e.message);
+  }
+
   out.textContent = linhas.join('\n');
 }
 on('diagBtn','click', runDiagnostico);
