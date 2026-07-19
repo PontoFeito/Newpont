@@ -1,0 +1,2850 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controle de Ponto</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#FFFFFF;
+  --paper:#FFFFFF;
+  --paper-dark:#F2F2F2;
+  --ink:#111111;
+  --muted:#5C5C5C;
+  --line:#CFCFCF;
+  --steel:#2F3E46;
+  --stamp-red:#A13636;
+  --confirm-green:#2E6B3E;
+}
+
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  padding:32px 16px 60px;
+}
+
+.wrap{max-width:760px;margin:0 auto;}
+
+.header{
+  position:relative;
+  text-align:center;
+  margin-bottom:22px;
+  color:var(--ink);
+  border-bottom:2px solid var(--ink);
+  padding-bottom:16px;
+}
+.header .eyebrow{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:3px;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+.header h1{
+  font-family:'Oswald',sans-serif;
+  font-weight:700;
+  font-size:30px;
+  letter-spacing:1px;
+  margin:6px 0 0;
+  text-transform:uppercase;
+  color:var(--ink);
+}
+.header .employee-name{
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+  letter-spacing:1px;
+  color:var(--ink);
+  margin-top:8px;
+  font-weight:700;
+}
+
+/* card */
+.card{
+  position:relative;
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  border-radius:4px;
+  padding:26px 26px 14px;
+}
+
+.clock-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--line);
+  padding-bottom:18px;
+  margin-bottom:20px;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.date-block .label{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--muted);
+  text-transform:uppercase;
+}
+.date-block .value{
+  font-family:'Oswald',sans-serif;
+  font-size:20px;
+  font-weight:600;
+  text-transform:capitalize;
+  color:var(--ink);
+}
+.clock{
+  font-family:'Space Mono',monospace;
+  font-size:32px;
+  font-weight:700;
+  letter-spacing:1px;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+
+/* status strip */
+.punch-status{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin-bottom:16px;
+}
+.stamp-item{
+  border:1.5px solid var(--line);
+  border-radius:3px;
+  padding:8px 6px;
+  text-align:center;
+  background:var(--paper-dark);
+}
+.stamp-item .stamp-label{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:9.5px;
+  letter-spacing:0.5px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:3px;
+}
+.stamp-item .stamp-time{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted);
+}
+.stamp-item.done{border-color:var(--ink); background:#fff;}
+.stamp-item.done .stamp-time{color:var(--confirm-green);}
+
+.btn-main{
+  width:100%;
+  border:2px solid var(--ink);
+  background:var(--ink);
+  color:#fff;
+  border-radius:3px;
+  padding:17px 10px;
+  font-family:'Oswald',sans-serif;
+  font-size:16px;
+  font-weight:600;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:opacity .12s ease;
+  margin-bottom:10px;
+}
+.btn-main:hover{opacity:0.85;}
+.btn-main:active{opacity:0.7;}
+.btn-main:disabled{
+  background:var(--paper-dark);
+  color:var(--muted);
+  border-color:var(--line);
+  cursor:default;
+  opacity:1;
+}
+.btn-main .sub{
+  display:block;
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:0;
+  text-transform:none;
+  margin-top:4px;
+  opacity:0.85;
+}
+
+.btn-row{display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap;}
+.edit-btn, .security-btn{
+  flex:1;
+  min-width:150px;
+  background:#fff;
+  border:1.5px solid var(--ink);
+  color:var(--ink);
+  border-radius:3px;
+  padding:9px 10px;
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  letter-spacing:0.5px;
+  cursor:pointer;
+}
+.edit-btn:hover, .security-btn:hover{background:var(--ink); color:#fff;}
+
+.summary{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:var(--paper-dark);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:10px 16px;
+  margin-bottom:22px;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+}
+.summary .tot-label{color:var(--muted); letter-spacing:1px; text-transform:uppercase; font-size:11px;}
+.summary .tot-value{font-size:18px; font-weight:700; color:var(--ink);}
+
+.toolbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.toolbar h2{
+  font-family:'Oswald',sans-serif;
+  font-size:15px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--ink);
+  margin:0;
+}
+.toolbar-actions{display:flex; gap:8px; flex-wrap:wrap;}
+.export-btn, .days-btn{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  background:#fff;
+  border:1px solid var(--ink);
+  border-radius:3px;
+  padding:6px 12px;
+  cursor:pointer;
+  color:var(--ink);
+}
+.export-btn:hover, .days-btn:hover{background:var(--ink); color:#fff;}
+.days-btn.active{background:var(--ink); color:#fff;}
+
+.days-panel{display:none;}
+.days-panel.show{display:block;}
+
+.month-nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:var(--paper-dark);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:8px 10px;
+  margin-bottom:10px;
+}
+.month-nav button{
+  border:1px solid var(--ink);
+  background:#fff;
+  border-radius:3px;
+  width:30px; height:28px;
+  font-family:'Space Mono',monospace;
+  font-size:14px;
+  cursor:pointer;
+  color:var(--ink);
+}
+.month-nav button:hover{background:var(--ink); color:#fff;}
+.month-nav .month-label{
+  font-family:'Oswald',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:1px;
+  text-transform:capitalize;
+  text-align:center;
+}
+.month-total{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  color:var(--ink);
+  font-weight:700;
+  text-align:center;
+}
+
+.table-wrap{
+  max-height:280px;
+  overflow-y:auto;
+  margin-bottom:8px;
+  border:1px solid var(--line);
+}
+table{width:100%; border-collapse:collapse; font-family:'Space Mono',monospace; font-size:12.5px;}
+th{
+  position:sticky; top:0;
+  background:var(--paper-dark);
+  text-align:left;
+  padding:6px 8px;
+  color:var(--ink);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:10.5px;
+  border-bottom:1.5px solid var(--ink);
+}
+td{padding:7px 8px; border-bottom:1px solid var(--line);}
+tr:last-child td{border-bottom:none;}
+.empty-row td{text-align:center; color:var(--muted); padding:22px 0; font-style:italic; font-family:'Inter',sans-serif;}
+.row-actions{display:flex; gap:6px;}
+.icon-btn{
+  background:none;border:none;cursor:pointer;font-size:13px; padding:2px 4px;
+}
+.icon-btn.edit{color:var(--steel);}
+.icon-btn.del{color:var(--stamp-red);}
+
+.footnote{
+  text-align:center;
+  color:var(--muted);
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  margin-top:18px;
+  letter-spacing:0.5px;
+}
+
+.toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:#fff;
+  padding:10px 18px; border-radius:4px;
+  font-family:'Inter',sans-serif; font-size:13px;
+  opacity:0; transition:opacity .25s ease, transform .25s ease;
+  pointer-events:none;
+  z-index:50;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  display:none; align-items:center; justify-content:center; z-index:60;
+  padding:16px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:#fff; border:1.5px solid var(--ink); border-radius:4px; padding:22px 24px;
+  max-width:320px; text-align:center;
+}
+.modal p{font-family:'Inter',sans-serif; font-size:14px; margin:0 0 16px;}
+.modal-actions{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+.modal-actions button{
+  font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:1px; text-transform:uppercase;
+  padding:8px 16px; border-radius:3px; cursor:pointer; border:2px solid var(--ink);
+}
+.modal-actions .confirm{background:var(--ink); color:#fff;}
+.modal-actions .cancel{background:none; color:var(--ink);}
+
+.modal-wide{max-width:340px; text-align:left;}
+.toggle-group{display:flex; gap:8px;}
+.toggle-btn{
+  flex:1; padding:8px 0; border:1.5px solid var(--ink); background:#fff;
+  border-radius:4px; font-family:'Inter',sans-serif; font-size:13px; font-weight:600;
+  cursor:pointer;
+}
+.toggle-btn.active{background:var(--ink); color:#fff;}
+
+.fullscreen-overlay{
+  position:fixed; inset:0; background:#f4f1ea;
+  display:none; flex-direction:column; z-index:80;
+}
+.fullscreen-overlay.show{display:flex;}
+.fs-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px; border-bottom:2px solid var(--ink); background:#fff;
+  flex-shrink:0;
+}
+.fs-header h2{margin:0; font-family:'Space Grotesk',sans-serif; font-size:20px; letter-spacing:0.5px;}
+.fs-close{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:36px; height:36px; font-size:18px; cursor:pointer; flex-shrink:0;
+}
+.fs-nav{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 18px; border-bottom:1px solid #ccc; background:#fff;
+  flex-shrink:0;
+}
+.fs-nav button{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:34px; height:34px; font-size:16px; cursor:pointer;
+}
+.fs-nav .fs-month-label{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;}
+.fs-nav .fs-month-total{font-family:'Inter',sans-serif; font-size:12px; color:#555;}
+.fs-body{flex:1; overflow-y:auto; padding:14px 16px 40px;}
+.fs-card{
+  background:#fff; border:1.5px solid var(--ink); border-radius:4px;
+  padding:12px 14px; margin-bottom:10px;
+}
+.fs-card-date{
+  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+  margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;
+}
+.fs-card-falta{color:var(--stamp-red); font-weight:700; font-family:'Inter',sans-serif;}
+.fs-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:8px;
+}
+.fs-grid div{text-align:center;}
+.fs-grid .fs-lbl{font-family:'Inter',sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#777;}
+.fs-grid .fs-val{font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;}
+.fs-totals{
+  display:flex; justify-content:space-between; padding-top:8px; border-top:1px dashed #ccc;
+  font-family:'Inter',sans-serif; font-size:13px;
+}
+.fs-totals .extra{color:var(--stamp-red); font-weight:600;}
+.fs-empty{text-align:center; color:#888; font-family:'Inter',sans-serif; padding:30px 0;}
+
+.menu-btn{
+  position:absolute; top:16px; left:16px;
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:38px; height:38px; font-size:18px; cursor:pointer; z-index:10;
+}
+.drawer-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:none; z-index:90;
+}
+.drawer-overlay.show{display:block;}
+.drawer{
+  position:fixed; top:0; left:0; bottom:0; width:88%; max-width:320px;
+  background:#f4f1ea; border-right:2px solid var(--ink);
+  display:flex; flex-direction:column;
+  transform:translateX(-100%); transition:transform 0.2s ease;
+}
+.drawer-overlay.show .drawer{transform:translateX(0);}
+.drawer-header{
+  padding:18px 16px; border-bottom:2px solid var(--ink); background:#fff;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.drawer-header h2{margin:0; font-family:'Space Grotesk',sans-serif; font-size:18px;}
+.drawer-close{border:1.5px solid var(--ink); background:#fff; border-radius:4px; width:32px; height:32px; font-size:16px; cursor:pointer;}
+.drawer-body{flex:1; overflow-y:auto; padding:8px 0;}
+.drawer-account{
+  padding:14px 16px; border-bottom:1px solid #ccc; background:#fff;
+}
+.drawer-account .acc-label{font-family:'Inter',sans-serif; font-size:11px; text-transform:uppercase; color:#888; letter-spacing:0.5px;}
+.drawer-account .acc-value{font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; word-break:break-all;}
+.drawer-section{padding:10px 16px 4px;}
+.drawer-section-title{
+  font-family:'Inter',sans-serif; font-size:11px; text-transform:uppercase;
+  letter-spacing:0.5px; color:#888; margin:10px 0 4px;
+}
+.drawer-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:11px 8px; border:none; background:none; text-align:left;
+  font-family:'Inter',sans-serif; font-size:14.5px; color:var(--ink);
+  cursor:pointer; border-radius:4px;
+}
+.drawer-item:active{background:#e8e4da;}
+.drawer-item .ic{width:20px; text-align:center; flex-shrink:0;}
+.drawer-footer{
+  border-top:2px solid var(--ink); padding:8px 8px calc(8px + env(safe-area-inset-bottom));
+  background:#fff;
+}
+.drawer-item.danger{color:var(--stamp-red);}
+.modal-wide h3{
+  font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase;
+  letter-spacing:1px; margin:0 0 14px; color:var(--ink);
+}
+.field-row{margin-bottom:12px;}
+.field-row label{
+  display:block; font-family:'Space Mono',monospace; font-size:11px;
+  letter-spacing:0.5px; text-transform:uppercase; color:var(--muted); margin-bottom:4px;
+}
+.field-row input{
+  width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:3px;
+  font-family:'Space Mono',monospace; font-size:14px; background:#fff; color:var(--ink);
+}
+.field-row input:focus{outline:2px solid var(--ink); border-color:var(--ink);}
+.link-btn{
+  background:none; border:none; color:var(--steel); text-decoration:underline;
+  font-family:'Inter',sans-serif; font-size:12.5px; cursor:pointer; padding:0; margin-top:2px;
+}
+.hint-text{font-family:'Inter',sans-serif; font-size:12.5px; color:var(--muted); margin:0 0 14px;}
+.question-box{
+  background:var(--paper-dark); border:1px solid var(--line); border-radius:3px;
+  padding:10px 12px; font-family:'Inter',sans-serif; font-size:13px; margin-bottom:14px;
+}
+
+.receipt{
+  border:1px solid var(--line);
+  border-radius:3px;
+  margin-bottom:16px;
+  overflow:hidden;
+}
+.receipt-row{
+  display:flex; justify-content:space-between; gap:10px;
+  padding:9px 12px;
+  border-bottom:1px solid var(--line);
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+}
+.receipt-row:last-child{border-bottom:none;}
+.receipt-row .r-label{color:var(--muted);}
+.receipt-row .r-value{font-weight:700; color:var(--ink);}
+.receipt-row.total{background:var(--paper-dark); font-size:14.5px;}
+.receipt-row.total .r-value{font-size:16px;}
+.receipt-note{
+  font-family:'Inter',sans-serif; font-size:11.5px; color:var(--muted);
+  padding:8px 12px; background:#fff; font-style:italic;
+}
+
+@media (max-width:480px){
+  .clock{font-size:24px;}
+  .header h1{font-size:22px;}
+  .punch-status{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-header">
+      <h2>Menu</h2>
+      <button class="drawer-close" id="drawerCloseBtn" aria-label="Fechar menu">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-account">
+        <div class="acc-label">Conta</div>
+        <div class="acc-value" id="drawerAccountEmail">—</div>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Perfil</div>
+        <button class="drawer-item" id="menuEditNameBtn"><span class="ic">👤</span> Editar informações pessoais</button>
+        <button class="drawer-item" id="menuLoginPasswordBtn"><span class="ic">🔑</span> Trocar senha de login</button>
+        <button class="drawer-item" id="menuPasswordBtn"><span class="ic">🔒</span> Senha de edição/exclusão</button>
+        <button class="drawer-item" id="menuLocationsBtn"><span class="ic">📍</span> Ver localizações das batidas</button>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Remuneração</div>
+        <button class="drawer-item" id="menuPayrollSetupBtn"><span class="ic">💰</span> Configurar remuneração</button>
+        <button class="drawer-item" id="menuPayrollSummaryBtn"><span class="ic">📊</span> Ver fechamento do mês</button>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Exportar</div>
+        <button class="drawer-item" id="menuExportCsvBtn"><span class="ic">🗂️</span> Exportar pontos (CSV)</button>
+        <button class="drawer-item" id="menuExportA4Btn"><span class="ic">📄</span> Exportar folha A4 (imprimir/PDF)</button>
+        <button class="drawer-item" id="menuExportExcelBtn"><span class="ic">📊</span> Exportar Excel</button>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-title">Importar</div>
+        <button class="drawer-item" id="menuImportCsvBtn"><span class="ic">📥</span> Importar pontos antigos (CSV)</button>
+        <input type="file" id="importCsvInput" accept=".csv,text/csv" style="display:none;">
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-item" id="menuLogoutBtn"><span class="ic">🚪</span> Sair</button>
+      <button class="drawer-item danger" id="menuSwitchAccountBtn"><span class="ic">🔁</span> Entrar em outra conta</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="header">
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+    <div class="eyebrow">Cartão de ponto digital</div>
+    <h1>Controle de Ponto</h1>
+    <div class="employee-name" id="employeeName">—</div>
+  </div>
+
+  <div class="card">
+    <div class="card-inner">
+      <div class="clock-row">
+        <div class="date-block">
+          <div class="label">Hoje</div>
+          <div class="value" id="dateValue">—</div>
+        </div>
+        <div class="clock" id="clock">00:00:00</div>
+      </div>
+
+      <div class="punch-status" id="punchStatus">
+        <div class="stamp-item" data-tipo="entrada"><span class="stamp-label">Entrada</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="almocoSaida"><span class="stamp-label">Saída Almoço</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="almocoVolta"><span class="stamp-label">Volta Almoço</span><span class="stamp-time">—</span></div>
+        <div class="stamp-item" data-tipo="saida"><span class="stamp-label">Saída</span><span class="stamp-time">—</span></div>
+      </div>
+
+      <button class="btn-main" id="punchBtn">Bater Ponto<span class="sub" id="punchBtnSub"></span></button>
+
+      <div class="btn-row">
+        <button class="edit-btn" id="editManualBtn">✎ Editar horários (protegido por senha)</button>
+      </div>
+
+      <div class="summary">
+        <span class="tot-label">Total trabalhado hoje</span>
+        <span class="tot-value" id="totalHoje">—</span>
+      </div>
+      <div class="summary" id="extraRow" style="display:none; border-color:var(--stamp-red);">
+        <span class="tot-label">Hora extra hoje (acima de 6h)</span>
+        <span class="tot-value" id="extraHoje" style="color:var(--stamp-red);">—</span>
+      </div>
+
+      <div class="toolbar">
+        <h2>Histórico</h2>
+        <div class="toolbar-actions">
+          <button class="days-btn" id="daysBtn">Ver dias trabalhados</button>
+          <button class="export-btn" id="fullscreenBtn">🔍 Tela cheia</button>
+        </div>
+      </div>
+
+      <div class="days-panel" id="daysPanel">
+        <div class="month-nav">
+          <button id="prevMonthBtn" aria-label="Mês anterior">‹</button>
+          <div>
+            <div class="month-label" id="monthLabel">—</div>
+            <div class="month-total" id="monthTotal">—</div>
+          </div>
+          <button id="nextMonthBtn" aria-label="Mês seguinte">›</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Data</th><th>Entrada</th><th>S. Almoço</th><th>V. Almoço</th><th>Saída</th><th>Total</th><th>Extra</th><th></th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- detalhamento em tela cheia -->
+  <div class="fullscreen-overlay" id="fullscreenOverlay">
+    <div class="fs-header">
+      <h2>Detalhamento de pontos</h2>
+      <button class="fs-close" id="fsCloseBtn" aria-label="Fechar">✕</button>
+    </div>
+    <div class="fs-nav">
+      <button id="fsPrevMonthBtn" aria-label="Mês anterior">‹</button>
+      <div>
+        <div class="fs-month-label" id="fsMonthLabel">—</div>
+        <div class="fs-month-total" id="fsMonthTotal">—</div>
+      </div>
+      <button id="fsNextMonthBtn" aria-label="Mês seguinte">›</button>
+    </div>
+    <div class="fs-body" id="fsBody"></div>
+  </div>
+
+  <div class="footnote">Os dados ficam salvos automaticamente na sua conta. Ajustes e exclusões exigem senha (ou digital/Face ID, se ativada).</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- login -->
+<div class="modal-overlay" id="authOverlay" style="z-index:100;">
+  <div class="modal modal-wide">
+    <h3 id="authTitle">Entrar</h3>
+    <p class="hint-text" id="authHint">Acesso restrito. Entre com sua conta.</p>
+    <div class="field-row">
+      <label>Entrar com</label>
+      <div class="toggle-group">
+        <button type="button" class="toggle-btn active" id="idTypeEmailBtn">E-mail</button>
+        <button type="button" class="toggle-btn" id="idTypeCpfBtn">CPF</button>
+      </div>
+    </div>
+    <div class="field-row">
+      <label for="authIdentifier" id="authIdentifierLabel">E-mail</label>
+      <input type="text" id="authIdentifier" autocomplete="username" placeholder="seu@email.com">
+    </div>
+    <div class="field-row">
+      <label for="authPassword">Senha</label>
+      <input type="password" id="authPassword" autocomplete="current-password">
+    </div>
+    <p id="authError" style="color:var(--stamp-red); font-family:'Inter',sans-serif; font-size:13px; min-height:16px; margin:0 0 12px;"></p>
+    <div class="modal-actions">
+      <button class="confirm" id="authSubmit" style="width:100%;">Entrar</button>
+    </div>
+    <p class="hint-text" style="margin-top:14px;">Sua conta é criada pelo administrador. Se ainda não recebeu um acesso, fale com ele.</p>
+  </div>
+</div>
+
+<!-- nome do usuário -->
+<div class="modal-overlay" id="nameOverlay">
+  <div class="modal modal-wide">
+    <h3>Seu nome</h3>
+    <p class="hint-text">Como você quer que seu nome apareça no cartão de ponto e nas exportações.</p>
+    <div class="field-row">
+      <label for="nameInput">Nome</label>
+      <input type="text" id="nameInput" autocomplete="off" placeholder="Ex.: Ana Souza">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="nameCancel">Cancelar</button>
+      <button class="confirm" id="nameSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- confirmação genérica (excluir dia, substituir batida) -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <p id="modalText"></p>
+    <div class="modal-actions">
+      <button class="cancel" id="modalCancel">Cancelar</button>
+      <button class="confirm" id="modalConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- pedir senha -->
+<!-- trocar senha de login (a que o ADM escolheu na criação da conta) -->
+<div class="modal-overlay" id="loginPasswordOverlay">
+  <div class="modal modal-wide">
+    <h3>Trocar senha de login</h3>
+    <p class="hint-text">Essa é a senha que você usa pra entrar no app. Depois de trocar, use a nova senha nos próximos acessos.</p>
+    <div class="field-row">
+      <label for="loginPasswordCurrent">Senha atual</label>
+      <input type="password" id="loginPasswordCurrent" autocomplete="current-password">
+    </div>
+    <div class="field-row">
+      <label for="loginPasswordNew">Nova senha</label>
+      <input type="password" id="loginPasswordNew" autocomplete="new-password">
+    </div>
+    <div class="field-row">
+      <label for="loginPasswordNewConfirm">Confirmar nova senha</label>
+      <input type="password" id="loginPasswordNewConfirm" autocomplete="new-password">
+    </div>
+    <p id="loginPasswordError" style="color:var(--stamp-red); font-family:'Inter',sans-serif; font-size:13px; min-height:16px; margin:0 0 12px;"></p>
+    <div class="modal-actions">
+      <button class="cancel" id="loginPasswordCancel">Cancelar</button>
+      <button class="confirm" id="loginPasswordConfirm">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- caixinha de localizações das batidas -->
+<div class="modal-overlay" id="locationsOverlay">
+  <div class="modal modal-wide">
+    <h3>Localizações das batidas</h3>
+    <p class="hint-text">A localização só é registrada no momento de bater o ponto. Escolha o período para ver.</p>
+    <div class="field-row">
+      <label for="locFrom">De</label>
+      <input type="date" id="locFrom">
+    </div>
+    <div class="field-row">
+      <label for="locTo">Até</label>
+      <input type="date" id="locTo">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="locationsCancel">Fechar</button>
+      <button class="confirm" id="locationsSearch">Buscar</button>
+    </div>
+    <div id="locationsList" style="max-height:300px; overflow-y:auto; margin-top:14px;"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="passwordOverlay">
+  <div class="modal modal-wide">
+    <h3>Senha necessária</h3>
+    <p class="hint-text">Digite sua senha para ajustar ou excluir os horários.</p>
+    <div class="field-row">
+      <label for="passwordInput">Senha</label>
+      <input type="password" id="passwordInput" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="passwordCancel">Cancelar</button>
+      <button class="confirm" id="passwordConfirm">Confirmar</button>
+    </div>
+    <button class="link-btn" id="forgotPasswordLink" style="margin-top:12px;">Esqueci minha senha</button>
+  </div>
+</div>
+
+<!-- pergunta de segurança para recuperação -->
+<div class="modal-overlay" id="forgotOverlay">
+  <div class="modal modal-wide">
+    <h3>Recuperar senha</h3>
+    <div class="question-box" id="forgotQuestionBox">—</div>
+    <div class="field-row">
+      <label for="forgotAnswer">Sua resposta</label>
+      <input type="text" id="forgotAnswer" autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="forgotCancel">Cancelar</button>
+      <button class="confirm" id="forgotVerify">Verificar</button>
+    </div>
+  </div>
+</div>
+
+<!-- configurar / redefinir senha e pergunta -->
+<div class="modal-overlay" id="setupOverlay">
+  <div class="modal modal-wide">
+    <h3 id="setupTitle">Configurar senha</h3>
+    <p class="hint-text" id="setupHint">Crie uma senha para proteger os ajustes de ponto.</p>
+    <div class="field-row">
+      <label for="setupPassword">Nova senha</label>
+      <input type="password" id="setupPassword" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <label for="setupPasswordConfirm">Confirmar senha</label>
+      <input type="password" id="setupPasswordConfirm" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <label for="setupQuestion">Pergunta de segurança (caso esqueça a senha)</label>
+      <input type="text" id="setupQuestion" placeholder="Ex.: Nome do meu primeiro animal de estimação">
+    </div>
+    <div class="field-row">
+      <label for="setupAnswer">Resposta</label>
+      <input type="text" id="setupAnswer" autocomplete="off">
+    </div>
+    <div class="field-row" id="biometricRow" style="display:none;">
+      <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);">
+        <input type="checkbox" id="setupBiometric" style="width:auto;">
+        Usar digital / Face ID neste aparelho (se falhar, será pedida a senha)
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="setupCancel">Cancelar</button>
+      <button class="confirm" id="setupSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- configurar dados de remuneração -->
+<div class="modal-overlay" id="payrollSetupOverlay">
+  <div class="modal modal-wide" style="max-height:85vh; overflow-y:auto;">
+    <h3>Configurar remuneração</h3>
+    <p class="hint-text">Preencha uma vez. Os dias úteis do mês (segunda a sexta) são calculados automaticamente pelo calendário.</p>
+    <div class="field-row">
+      <label for="pSalario">Salário mensal (R$)</label>
+      <input type="number" step="0.01" min="0" id="pSalario" placeholder="Ex.: 1500.00">
+    </div>
+    <div class="field-row">
+      <label for="pVA">Vale Alimentação por dia trabalhado (R$)</label>
+      <input type="number" step="0.01" min="0" id="pVA" placeholder="Ex.: 25.00">
+    </div>
+    <div class="field-row">
+      <label for="pVC">Vale Combustível por dia trabalhado (R$)</label>
+      <input type="number" step="0.01" min="0" id="pVC" placeholder="Ex.: 15.00">
+    </div>
+
+    <div class="field-row" style="border-top:1.5px solid var(--line); padding-top:12px; margin-top:4px;">
+      <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--ink);">
+        <input type="checkbox" id="pIsCLT" style="width:auto;">
+        Sou CLT (calcular INSS, FGTS e Vale Transporte)
+      </label>
+    </div>
+
+    <div id="cltFields" style="display:none;">
+      <p class="hint-text" style="margin-top:0;">O INSS é descontado do salário automaticamente pela tabela vigente. O FGTS é informativo (depositado pelo empregador, não sai do seu salário).</p>
+      <div class="field-row">
+        <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--ink);">
+          <input type="checkbox" id="pVTAtivo" style="width:auto;">
+          Uso vale transporte
+        </label>
+      </div>
+      <div id="vtFields" style="display:none;">
+        <div class="field-row">
+          <label for="pVTValorDia">Valor do vale transporte por dia (R$)</label>
+          <input type="number" step="0.01" min="0" id="pVTValorDia" placeholder="Ex.: 8.80">
+        </div>
+        <div class="field-row">
+          <label for="pVTPercentual">Percentual descontado do salário (%)</label>
+          <input type="number" step="0.1" min="0" max="100" id="pVTPercentual" placeholder="Ex.: 6 (padrão legal é até 6%)">
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="cancel" id="payrollSetupCancel">Cancelar</button>
+      <button class="confirm" id="payrollSetupSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- fechamento do mês -->
+<div class="modal-overlay" id="payrollOverlay">
+  <div class="modal modal-wide">
+    <h3 id="payrollTitle">Fechamento do mês</h3>
+    <div class="receipt" id="payrollReceipt"></div>
+    <div class="modal-actions">
+      <button class="cancel" id="payrollEditData">Editar valores</button>
+      <button class="confirm" id="payrollClose">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- editar horários -->
+<div class="modal-overlay" id="editModalOverlay">
+  <div class="modal modal-wide">
+    <h3>Solicitar ajuste de horários</h3>
+    <p class="hint-text">Isso não muda o ponto na hora — vira uma solicitação, e o administrador precisa aprovar.</p>
+    <div class="field-row">
+      <label for="editDate">Data</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="field-row">
+      <label for="editEntrada">Entrada</label>
+      <input type="time" id="editEntrada">
+    </div>
+    <div class="field-row">
+      <label for="editAlmocoSaida">Saída Almoço</label>
+      <input type="time" id="editAlmocoSaida">
+    </div>
+    <div class="field-row">
+      <label for="editAlmocoVolta">Volta Almoço</label>
+      <input type="time" id="editAlmocoVolta">
+    </div>
+    <div class="field-row">
+      <label for="editSaida">Saída</label>
+      <input type="time" id="editSaida">
+    </div>
+    <div class="field-row" style="margin-bottom:6px;">
+      <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);">
+        <input type="checkbox" id="editFalta" style="width:auto;">
+        Marcar como falta (dia não trabalhado, sem horários)
+      </label>
+    </div>
+    <div class="field-row">
+      <label for="editJustificativa">Justificativa (obrigatória)</label>
+      <textarea id="editJustificativa" rows="3" style="width:100%; padding:10px; border:1.5px solid var(--ink); border-radius:3px; font-family:'Inter',sans-serif; font-size:14px;" placeholder="Explique o motivo do ajuste"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="editCancel">Cancelar</button>
+      <button class="confirm" id="editSave">Enviar para aprovação</button>
+    </div>
+  </div>
+</div>
+
+<!-- exclusão também vira solicitação, com justificativa -->
+<div class="modal-overlay" id="deleteJustOverlay">
+  <div class="modal modal-wide">
+    <h3>Solicitar exclusão do dia</h3>
+    <p class="hint-text" id="deleteJustDateLabel">—</p>
+    <div class="field-row">
+      <label for="deleteJustificativa">Justificativa (obrigatória)</label>
+      <textarea id="deleteJustificativa" rows="3" style="width:100%; padding:10px; border:1.5px solid var(--ink); border-radius:3px; font-family:'Inter',sans-serif; font-size:14px;" placeholder="Explique o motivo da exclusão"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="cancel" id="deleteJustCancel">Cancelar</button>
+      <button class="confirm" id="deleteJustSend">Enviar para aprovação</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Firebase: autenticação por e-mail/senha + Firestore como banco único ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA_hyosRTkvlk8_Qj-V9k0-2fiy1b9MYVM",
+  authDomain: "controle-ponto-7a04d.firebaseapp.com",
+  projectId: "controle-ponto-7a04d",
+  storageBucket: "controle-ponto-7a04d.firebasestorage.app",
+  messagingSenderId: "458473922894",
+  appId: "1:458473922894:web:f72ee3fa6f017af660fe1f",
+  measurementId: "G-F7VQSSTHNN"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+const STORAGE_KEY = 'ponto-records';
+const SECURITY_KEY = 'ponto-security';
+const PAYROLL_KEY = 'ponto-payroll';
+const PROFILE_KEY = 'ponto-perfil';
+const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
+const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
+let records = {};
+let security = null; // {passwordHash, question, answerHash}
+let payroll = null; // {salario, va, vc} — dias úteis são calculados automaticamente pelo calendário
+let profile = null; // {nome}
+let employee = null; // {nome, identifier, status:'ativo'|'demitido', demitidoEm, tipoPagamento:'mensalista'|'diarista', diariaValores:{4,6,8}}
+let viewMonth = null; // 'YYYY-MM'
+let pendingAction = null; // 'edit' | 'changePassword'
+let pendingEditDate = null;
+let setupMode = 'initial'; // 'initial' | 'change' | 'reset'
+let senhaFalhas = 0; // tentativas erradas seguidas da senha de edição
+let senhaBloqueadaAte = 0; // timestamp até quando fica bloqueado
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function nowTime(){
+  const d = new Date();
+  return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function displayDate(key){
+  const [y,m,d] = key.split('-');
+  const dt = new Date(+y, +m-1, +d);
+  const dias = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  return `${pad(d)}/${pad(m)}/${y} · ${dias[dt.getDay()]}`;
+}
+function displayDateShort(key){
+  const [y,m,d] = key.split('-');
+  return `${pad(d)}/${pad(m)}/${y}`;
+}
+function monthKeyOf(key){ return key.slice(0,7); }
+function monthLabelOf(mk){
+  const [y,m] = mk.split('-');
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  return `${meses[+m-1]} de ${y}`;
+}
+function shiftMonth(mk, delta){
+  let [y,m] = mk.split('-').map(Number);
+  m += delta;
+  if(m<1){ m=12; y-=1; } else if(m>12){ m=1; y+=1; }
+  return `${y}-${pad(m)}`;
+}
+
+function formatBRL(n){
+  return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+const LIMITE_NORMAL_MIN = 6*60; // 6 horas: acima disso vira hora extra
+
+function timeToMinutes(t){
+  if(!t) return null;
+  const [h,m] = t.split(':').map(Number);
+  return h*60+m;
+}
+function formatMinutes(mins){
+  const h = Math.floor(mins/60);
+  const mm = mins%60;
+  return `${h}h${pad(mm)}`;
+}
+function activeTipos(){
+  return isDiarista() ? ['entrada','saida'] : TIPOS;
+}
+// Diária: acha o "degrau" (4h/6h/8h) mais próximo, sem passar do que foi
+// trabalhado, e o valor correspondente já cadastrado pelo ADM.
+function calcDiaria(mins){
+  const v = (employee && employee.diariaValores) || {};
+  const horas = mins/60;
+  let tier = null;
+  if(horas >= 8) tier = 8; else if(horas >= 6) tier = 6; else if(horas >= 4) tier = 4;
+  if(tier){
+    return { tier, valor: Number(v[tier]||v[String(tier)]||0), estimado:false };
+  }
+  // menos de 4h: estimativa proporcional usando o valor de 4h como base
+  const base = Number(v['4']||v[4]||0);
+  return { tier:null, valor: base ? (base/4)*horas : 0, estimado:true };
+}
+function calcTotal(rec){
+  if(!rec) return null;
+  if(rec.falta) return {falta:true, text:'Falta', mins:0, complete:true, extraMins:0, normalMins:0};
+  if(rec.diarista){
+    const e = timeToMinutes(rec.entrada);
+    const s = timeToMinutes(rec.saida);
+    if(e===null || s===null) return null;
+    const mins = Math.max(0, s-e);
+    return {text:formatMinutes(mins), mins, complete:true, extraMins:0, normalMins:mins, diarista:true};
+  }
+  const e = timeToMinutes(rec.entrada);
+  const as = timeToMinutes(rec.almocoSaida);
+  const av = timeToMinutes(rec.almocoVolta);
+  const s = timeToMinutes(rec.saida);
+  let mins = 0;
+  let complete = true;
+  if(e!==null && as!==null){ mins += (as-e); } else complete = false;
+  if(av!==null && s!==null){ mins += (s-av); } else complete = false;
+  if(mins<=0 && !complete) return null;
+  const extraMins = mins > LIMITE_NORMAL_MIN ? mins - LIMITE_NORMAL_MIN : 0;
+  const normalMins = mins - extraMins;
+  return {text:formatMinutes(mins), mins, complete, extraMins, normalMins};
+}
+
+// --- hashing simples (SHA-256) para não guardar senha em texto puro ---
+async function hashText(text){
+  const enc = new TextEncoder().encode('ponto-app::'+text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// --- digital / Face ID (WebAuthn), com fallback automático para senha ---
+function supportsWebAuthn(){
+  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+}
+function randomBytes(len){
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return arr;
+}
+function bufToBase64(buf){
+  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+}
+function base64ToBuf(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+async function registerBiometric(){
+  if(!supportsWebAuthn()) return null;
+  try{
+    const cred = await navigator.credentials.create({
+      publicKey:{
+        challenge: randomBytes(32),
+        rp:{ name:'Controle de Ponto' },
+        user:{ id: randomBytes(16), name:'usuario-ponto', displayName:'Usuário' },
+        pubKeyCredParams:[{type:'public-key', alg:-7},{type:'public-key', alg:-257}],
+        authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required' },
+        timeout:60000,
+        attestation:'none'
+      }
+    });
+    if(!cred) return null;
+    return bufToBase64(cred.rawId);
+  }catch(e){
+    return null;
+  }
+}
+async function verifyBiometric(){
+  if(!security || !security.biometricEnabled || !security.biometricCredentialId) return false;
+  if(!supportsWebAuthn()) return false;
+  try{
+    const assertion = await navigator.credentials.get({
+      publicKey:{
+        challenge: randomBytes(32),
+        allowCredentials:[{ id: base64ToBuf(security.biometricCredentialId), type:'public-key' }],
+        userVerification:'required',
+        timeout:60000
+      }
+    });
+    return !!assertion;
+  }catch(e){
+    return false;
+  }
+}
+
+// --- camada de armazenamento: cada usuário logado tem sua própria coleção
+// no Firestore (users/{uid}/appdata/{chave}), então os dados ficam num
+// lugar só na nuvem e sincronizam em qualquer aparelho que fizer login.
+let lastStorageError = null;
+function currentUid(){
+  return auth.currentUser ? auth.currentUser.uid : null;
+}
+// Se o Firebase não responder em 12s (sem internet, rede instável, etc.),
+// desistimos e avisamos, em vez de deixar a tela travada esperando pra sempre.
+function withTimeout(promise, ms){
+  const TIMED_OUT = Symbol('timeout');
+  return Promise.race([
+    promise.then(v=>({v, timedOut:false})),
+    new Promise(resolve=>setTimeout(()=>resolve({v:null, timedOut:true}), ms))
+  ]);
+}
+// Usamos a API REST do Firestore (pedidos HTTP comuns) em vez do canal
+// "sempre aberto" do SDK, porque esse canal especial vem travando em
+// algumas redes/aparelhos sem nunca dar erro. Pedidos HTTP comuns são o
+// mesmo tipo de conexão usada para abrir qualquer página — muito mais
+// compatível.
+const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/default/documents`;
+
+async function storageGet(key){
+  const uid = currentUid();
+  if(!uid) return null;
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}`;
+    const {v:res, timedOut} = await withTimeout(
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } }), 12000
+    );
+    if(timedOut){
+      lastStorageError = 'tempo esgotado — verifique sua internet';
+      return null;
+    }
+    if(res.status === 404) return null;
+    if(!res.ok){
+      let detail = '';
+      try{ const errBody = await res.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
+      lastStorageError = 'http ' + res.status + detail;
+      return null;
+    }
+    const data = await res.json();
+    const value = data.fields && data.fields.value && data.fields.value.stringValue;
+    if(value !== undefined) writeCache(key, value);
+    return value !== undefined ? {value} : null;
+  }catch(e){
+    console.error('storageGet', e);
+    lastStorageError = (e.message || 'erro desconhecido');
+    return null;
+  }
+}
+async function storageSet(key, value){
+  const uid = currentUid();
+  if(!uid){ lastStorageError = 'sem usuário logado'; return false; }
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(key)}`;
+    const body = {
+      fields: {
+        value: { stringValue: value },
+        updatedAt: { timestampValue: new Date().toISOString() }
+      }
+    };
+    const {v:res, timedOut} = await withTimeout(
+      fetch(url, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }), 12000
+    );
+    if(timedOut){
+      lastStorageError = 'tempo esgotado — verifique sua internet';
+      return false;
+    }
+    if(!res.ok){
+      let detail = '';
+      try{ const errBody = await res.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
+      lastStorageError = 'http ' + res.status + detail;
+      return false;
+    }
+    writeCache(key, value);
+    return true;
+  }catch(e){
+    console.error('storageSet', e);
+    lastStorageError = (e.message || 'erro desconhecido');
+    return false;
+  }
+}
+
+// --- documento "employees/{uid}": é o que o site do ADM enxerga de cada
+// pessoa (nome, status, forma de pagamento e valores da diária). O valor
+// da diária só pode ser alterado pelo ADM — o app aqui só lê.
+async function employeeDocGet(){
+  const uid = currentUid();
+  if(!uid) return null;
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/employees/${uid}`;
+    const res = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+    if(res.status === 404) return null;
+    if(!res.ok) return null;
+    const data = await res.json();
+    return firestoreFieldsToObj(data.fields);
+  }catch(e){ return null; }
+}
+// Grava só os campos passados (updateMask) — assim nunca sobrescrevemos
+// por acidente campos que só o ADM deveria controlar (status, tipo de
+// pagamento, valores da diária).
+async function employeeDocSetFields(fieldsObj){
+  const uid = currentUid();
+  if(!uid) return false;
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const keys = Object.keys(fieldsObj);
+    const mask = keys.map(k=>`updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    const url = `${FIRESTORE_REST_BASE}/employees/${uid}?${mask}`;
+    const res = await fetch(url, {
+      method:'PATCH',
+      headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields: objToFirestoreFields(fieldsObj) })
+    });
+    return res.ok;
+  }catch(e){ return false; }
+}
+function firestoreFieldsToObj(fields){
+  if(!fields) return {};
+  const out = {};
+  for(const k in fields){
+    const v = fields[k];
+    if(v.stringValue !== undefined) out[k] = v.stringValue;
+    else if(v.integerValue !== undefined) out[k] = parseInt(v.integerValue,10);
+    else if(v.doubleValue !== undefined) out[k] = v.doubleValue;
+    else if(v.booleanValue !== undefined) out[k] = v.booleanValue;
+    else if(v.nullValue !== undefined) out[k] = null;
+    else if(v.mapValue !== undefined) out[k] = firestoreFieldsToObj(v.mapValue.fields||{});
+    else if(v.arrayValue !== undefined) out[k] = (v.arrayValue.values||[]).map(item=>{
+      if(item.stringValue !== undefined) return item.stringValue;
+      if(item.integerValue !== undefined) return parseInt(item.integerValue,10);
+      if(item.mapValue !== undefined) return firestoreFieldsToObj(item.mapValue.fields||{});
+      return null;
+    });
+    else out[k] = null;
+  }
+  return out;
+}
+function objToFirestoreFields(obj){
+  const fields = {};
+  for(const k in obj){
+    const v = obj[k];
+    if(v === null || v === undefined) fields[k] = { nullValue:null };
+    else if(Array.isArray(v)) fields[k] = { arrayValue:{ values: v.map(item=>{
+      if(typeof item === 'number') return Number.isInteger(item) ? {integerValue:String(item)} : {doubleValue:item};
+      if(typeof item === 'object') return { mapValue:{ fields: objToFirestoreFields(item) } };
+      return { stringValue:String(item) };
+    }) } };
+    else if(typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue:String(v) } : { doubleValue:v };
+    else if(typeof v === 'boolean') fields[k] = { booleanValue:v };
+    else if(typeof v === 'object') fields[k] = { mapValue:{ fields: objToFirestoreFields(v) } };
+    else fields[k] = { stringValue:String(v) };
+  }
+  return fields;
+}
+// Some coleções negam list() pro ADM mesmo com as regras certas (limitação
+// chata do Firestore). Por isso, além de criar a solicitação, guardamos o
+// ID dela num índice (documento único) que o painel do ADM lê com "get"
+// em vez de listar a coleção inteira.
+async function addIdToIndex(indexDocId, novoId){
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/admin_index/${indexDocId}`;
+    const getRes = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
+    let ids = [];
+    if(getRes.ok){
+      const data = await getRes.json();
+      ids = firestoreFieldsToObj(data.fields).ids || [];
+    }
+    if(ids.includes(novoId)) return true;
+    ids.push(novoId);
+    const res = await fetch(url, {
+      method:'PATCH',
+      headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields: objToFirestoreFields({ ids }) })
+    });
+    return res.ok;
+  }catch(e){ return false; }
+}
+// --- solicitações de ajuste: toda edição/exclusão de ponto agora vira um
+// pedido pendente na coleção "solicitacoes", que só o ADM consegue ver e
+// aprovar/rejeitar. Enquanto isso, o dia mostra "pendente" mas o valor
+// batido continua o mesmo até a aprovação.
+async function createSolicitacao(fields){
+  const uid = currentUid();
+  if(!uid) return false;
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(`${FIRESTORE_REST_BASE}/solicitacoes`, {
+      method:'POST',
+      headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields: objToFirestoreFields({ ...fields, uid, status:'pendente', criadoEm:new Date().toISOString() }) })
+    });
+    if(!res.ok) return false;
+    const created = await res.json();
+    const novoId = created.name.split('/').pop();
+    await addIdToIndex('solicitacoes', novoId);
+    return true;
+  }catch(e){ return false; }
+}
+
+// Só LÊ o employees/{uid} — quem cria é sempre o ADM, pelo painel dele.
+// Se não existir (conta criada direto no Firebase sem passar pelo ADM,
+// por exemplo), a pessoa consegue entrar mas não consegue bater ponto.
+async function ensureEmployeeDoc(nomeAtual, identifierAtual){
+  const existing = await employeeDocGet();
+  if(existing){
+    employee = existing;
+    // mantém o nome sincronizado (só o campo nome — nunca mexe em status/tipo/diária)
+    if(nomeAtual && existing.nome !== nomeAtual){
+      await employeeDocSetFields({ nome: nomeAtual });
+      employee.nome = nomeAtual;
+    }
+    return;
+  }
+  employee = null;
+}
+function isDemitido(){
+  return !!(employee && employee.status === 'demitido');
+}
+function temCadastroLiberado(){
+  return !!employee;
+}
+function isDiarista(){
+  return !!(employee && employee.tipoPagamento === 'diarista');
+}
+
+// Cache local: guarda uma cópia de cada dado no próprio aparelho, pra
+// mostrar algo na tela IMEDIATAMENTE ao abrir o app, sem esperar a rede.
+// O Firestore continua sendo a fonte de verdade — assim que a resposta
+// do servidor chega, a tela é atualizada de novo com o valor mais recente.
+function cacheKeyFor(key){
+  return `ponto-cache:${currentUid()}:${key}`;
+}
+function readCache(key){
+  try{
+    return localStorage.getItem(cacheKeyFor(key));
+  }catch(e){
+    return null;
+  }
+}
+function writeCache(key, value){
+  try{
+    localStorage.setItem(cacheKeyFor(key), value);
+  }catch(e){
+    // armazenamento local cheio/indisponível — sem problema, é só um acelerador
+  }
+}
+function hydrateFromCache(){
+  try{
+    const r = readCache(STORAGE_KEY); if(r) records = JSON.parse(r);
+    const s = readCache(SECURITY_KEY); if(s) security = JSON.parse(s);
+    const p = readCache(PAYROLL_KEY); if(p) payroll = JSON.parse(p);
+    const pr = readCache(PROFILE_KEY); if(pr) profile = JSON.parse(pr);
+  }catch(e){
+    // cache corrompido — ignora e deixa a busca no servidor preencher tudo
+  }
+}
+
+async function loadRecords(){
+  try{
+    const res = await storageGet(STORAGE_KEY);
+    records = res && res.value ? JSON.parse(res.value) : {};
+  }catch(e){
+    records = {};
+  }
+}
+async function saveRecords(){
+  const ok = await storageSet(STORAGE_KEY, JSON.stringify(records));
+  if(!ok) showToast('Não foi possível salvar (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  return ok;
+}
+async function loadSecurity(){
+  try{
+    const res = await storageGet(SECURITY_KEY);
+    security = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    security = null;
+  }
+}
+async function saveSecurity(sec){
+  const ok = await storageSet(SECURITY_KEY, JSON.stringify(sec));
+  if(ok){
+    security = sec;
+  }else{
+    showToast('Não foi possível salvar a senha (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
+}
+async function loadPayroll(){
+  try{
+    const res = await storageGet(PAYROLL_KEY);
+    payroll = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    payroll = null;
+  }
+}
+async function savePayroll(p){
+  const ok = await storageSet(PAYROLL_KEY, JSON.stringify(p));
+  if(ok){
+    payroll = p;
+  }else{
+    showToast('Não foi possível salvar os dados de remuneração (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
+}
+async function loadProfile(){
+  try{
+    const res = await storageGet(PROFILE_KEY);
+    profile = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){
+    profile = null;
+  }
+}
+async function saveProfile(p){
+  const ok = await storageSet(PROFILE_KEY, JSON.stringify(p));
+  if(ok){
+    profile = p;
+  }else{
+    showToast('Não foi possível salvar o nome (' + (lastStorageError||'erro desconhecido') + ').', 6000);
+  }
+  return ok;
+}
+
+function openNamePrompt(){
+  document.getElementById('nameInput').value = profile ? profile.nome : '';
+  document.getElementById('nameOverlay').classList.add('show');
+}
+function closeNamePrompt(){
+  document.getElementById('nameOverlay').classList.remove('show');
+}
+function renderProfile(){
+  document.getElementById('employeeName').textContent = profile && profile.nome ? profile.nome : 'Sem nome definido';
+}
+async function onNameSave(){
+  const nome = document.getElementById('nameInput').value.trim();
+  if(!nome){ showToast('Digite um nome.'); return; }
+  const btn = document.getElementById('nameSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+  const ok = await saveProfile({nome});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
+  if(!ok) return;
+  renderProfile();
+  closeNamePrompt();
+  showToast('Nome salvo.');
+}
+
+function showToast(msg, duration){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), duration || 2200);
+}
+
+// Rede de segurança: se algo quebrar em qualquer lugar do app, isso é
+// capturado aqui em vez de travar tudo silenciosamente sem explicação.
+let lastGlobalErrorToast = 0;
+function notifyUnexpectedError(){
+  const now = Date.now();
+  if(now - lastGlobalErrorToast > 4000){
+    lastGlobalErrorToast = now;
+    showToast('Ocorreu um erro inesperado. Se a tela não responder, feche e abra o app de novo.', 4000);
+  }
+}
+window.addEventListener('error', (e)=>{
+  console.error('Erro:', e.error || e.message);
+  notifyUnexpectedError();
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  console.error('Erro assíncrono:', e.reason);
+  notifyUnexpectedError();
+});
+// Liga um evento a um elemento sem deixar que um erro dentro do handler
+// (ou um id que não existe) interrompa o resto dos listeners do app.
+function on(id, event, handler){
+  const el = document.getElementById(id);
+  if(!el){ console.warn('Elemento não encontrado para listener:', id); return; }
+  el.addEventListener(event, (e)=>{
+    try{
+      const result = handler(e);
+      if(result && typeof result.catch === 'function'){
+        result.catch(err=>{ console.error('Erro em', id, err); notifyUnexpectedError(); });
+      }
+    }catch(err){
+      console.error('Erro em', id, err);
+      notifyUnexpectedError();
+    }
+  });
+}
+
+function askConfirm(text){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById('modalOverlay');
+    document.getElementById('modalText').textContent = text;
+    overlay.classList.add('show');
+    const cleanup = (val)=>{
+      overlay.classList.remove('show');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    };
+    const confirmBtn = document.getElementById('modalConfirm');
+    const cancelBtn = document.getElementById('modalCancel');
+    const onConfirm = ()=>cleanup(true);
+    const onCancel = ()=>cleanup(false);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// --- batida única, sequencial ---
+function nextPendingTipo(rec){
+  for(const t of activeTipos()){
+    if(!rec || !rec[t]) return t;
+  }
+  return null;
+}
+
+// Localização é exigida em toda batida, pra servir de comprovante. Se a
+// pessoa negar ou o aparelho não conseguir localizar, a batida é bloqueada
+// (nada é salvo) e pedimos pra ativar o GPS/localização e tentar de novo.
+function getLocationForPunch(){
+  return new Promise((resolve)=>{
+    if(!('geolocation' in navigator)){
+      resolve({ok:false, error:'Este aparelho/navegador não tem suporte a localização.'});
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>{
+        resolve({ok:true, loc:{
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          capturedAt: new Date().toISOString()
+        }});
+      },
+      (err)=>{
+        let msg = 'Não foi possível obter sua localização.';
+        if(err.code === 1) msg = 'Localização negada. Ative a permissão de localização pra bater o ponto.';
+        else if(err.code === 2) msg = 'Localização indisponível. Verifique o GPS e tente de novo.';
+        else if(err.code === 3) msg = 'Tempo esgotado ao buscar localização. Tente de novo.';
+        resolve({ok:false, error:msg});
+      },
+      { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+    );
+  });
+}
+
+async function registrar(tipo, loc){
+  const key = todayKey();
+  const backup = records[key] ? {...records[key]} : null;
+  if(!records[key]){
+    records[key] = isDiarista()
+      ? {entrada:null, saida:null, diarista:true}
+      : {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  }
+  const rec = records[key];
+  const horario = nowTime();
+  rec[tipo] = horario;
+  if(loc) rec[tipo+'Loc'] = loc;
+  const ok = await saveRecords();
+  if(!ok){
+    // desfaz a alteração local já que não foi salva de verdade
+    if(backup){ records[key] = backup; } else { delete records[key]; }
+    return;
+  }
+  renderToday();
+  renderHistory();
+  showToast(`${LABELS[tipo]} registrada às ${horario} (com localização)`);
+}
+
+async function handlePunch(){
+  if(isDemitido()){
+    showToast('Seu acesso para bater ponto foi encerrado.');
+    return;
+  }
+  if(!temCadastroLiberado()){
+    showToast('Seu cadastro ainda não foi liberado pelo administrador.', 6000);
+    return;
+  }
+  const key = todayKey();
+  const rec = records[key] || {};
+  if(rec.falta){
+    showToast('Hoje está marcado como falta. Edite o dia (senha) para desmarcar.');
+    return;
+  }
+  const tipo = nextPendingTipo(rec);
+  if(!tipo){
+    showToast('Todas as batidas de hoje já foram feitas. Use "Editar horários" para ajustar.');
+    return;
+  }
+  const btn = document.getElementById('punchBtn');
+  btn.disabled = true;
+  const subEl = document.getElementById('punchBtnSub');
+  const subBackup = subEl.textContent;
+  subEl.textContent = 'Obtendo localização...';
+  const res = await getLocationForPunch();
+  if(!res.ok){
+    showToast(res.error, 6000);
+    subEl.textContent = subBackup;
+    updatePunchButton();
+    return;
+  }
+  await registrar(tipo, res.loc);
+}
+
+function updatePunchButton(){
+  const rec = records[todayKey()] || {};
+  const btn = document.getElementById('punchBtn');
+  const sub = document.getElementById('punchBtnSub');
+  if(isDemitido()){
+    btn.disabled = true;
+    btn.firstChild.textContent = 'Acesso encerrado';
+    sub.textContent = 'Fale com o responsável';
+    return;
+  }
+  if(!temCadastroLiberado()){
+    btn.disabled = true;
+    btn.firstChild.textContent = 'Cadastro pendente';
+    sub.textContent = 'Aguardando liberação do administrador';
+    return;
+  }
+  if(rec.falta){
+    btn.disabled = true;
+    btn.firstChild.textContent = 'Falta registrada hoje';
+    sub.textContent = 'Edite o dia (senha) para desmarcar';
+    return;
+  }
+  const tipos = activeTipos();
+  const tipo = nextPendingTipo(rec);
+  if(!tipo){
+    btn.disabled = true;
+    btn.firstChild.textContent = 'Dia completo ✓';
+    sub.textContent = '';
+  }else{
+    btn.disabled = false;
+    btn.firstChild.textContent = `Bater ${LABELS[tipo]}`;
+    const doneCount = tipos.indexOf(tipo);
+    sub.textContent = doneCount===0 ? 'próxima batida (pede localização)' : `${doneCount} de ${tipos.length} já registradas`;
+  }
+}
+
+function renderToday(){
+  document.getElementById('dateValue').textContent = displayDate(todayKey());
+  const rec = records[todayKey()] || {};
+  const diarista = isDiarista();
+  TIPOS.forEach(tipo=>{
+    const item = document.querySelector(`.stamp-item[data-tipo="${tipo}"]`);
+    const escondeAlmoco = diarista && (tipo==='almocoSaida' || tipo==='almocoVolta');
+    item.style.display = escondeAlmoco ? 'none' : '';
+    if(escondeAlmoco) return;
+    const span = item.querySelector('.stamp-time');
+    if(rec[tipo]){
+      span.textContent = rec[tipo];
+      item.classList.add('done');
+    }else{
+      span.textContent = '—';
+      item.classList.remove('done');
+    }
+  });
+  const tot = calcTotal(rec);
+  let totalTexto = tot ? (tot.falta ? 'Falta registrada' : tot.text + (tot.complete?'':' (parcial)')) : '—';
+  if(rec.pendingRequest) totalTexto += ' · ⏳ ajuste pendente de aprovação';
+  document.getElementById('totalHoje').textContent = totalTexto;
+  const extraRow = document.getElementById('extraRow');
+  if(diarista && tot && !tot.falta && tot.complete){
+    const d = calcDiaria(tot.mins);
+    extraRow.style.display='flex';
+    document.querySelector('#extraRow .tot-label').textContent = d.tier ? `Diária (${d.tier}h)` : 'Diária (proporcional, <4h)';
+    document.getElementById('extraHoje').textContent = formatBRL(d.valor);
+  }else if(tot && !tot.falta && tot.extraMins>0){
+    extraRow.style.display='flex';
+    document.querySelector('#extraRow .tot-label').textContent = 'Hora extra hoje (acima de 6h)';
+    document.getElementById('extraHoje').textContent = formatMinutes(tot.extraMins);
+  }else{
+    extraRow.style.display='none';
+  }
+  updatePunchButton();
+}
+
+// --- fluxo de senha ---
+// --- caixinha de localizações das batidas ---
+// --- trocar senha de login (Firebase Auth exige login recente pra isso,
+// então reautenticamos com a senha atual antes de trocar) ---
+function openLoginPasswordModal(){
+  document.getElementById('loginPasswordCurrent').value = '';
+  document.getElementById('loginPasswordNew').value = '';
+  document.getElementById('loginPasswordNewConfirm').value = '';
+  document.getElementById('loginPasswordError').textContent = '';
+  document.getElementById('loginPasswordOverlay').classList.add('show');
+}
+function closeLoginPasswordModal(){
+  document.getElementById('loginPasswordOverlay').classList.remove('show');
+}
+async function onLoginPasswordConfirm(){
+  const atual = document.getElementById('loginPasswordCurrent').value;
+  const nova = document.getElementById('loginPasswordNew').value;
+  const novaConfirm = document.getElementById('loginPasswordNewConfirm').value;
+  const errEl = document.getElementById('loginPasswordError');
+  errEl.textContent = '';
+  if(!atual || !nova){ errEl.textContent = 'Preencha a senha atual e a nova senha.'; return; }
+  if(nova.length < 6){ errEl.textContent = 'A nova senha deve ter pelo menos 6 caracteres.'; return; }
+  if(nova !== novaConfirm){ errEl.textContent = 'As senhas novas não coincidem.'; return; }
+  const user = auth.currentUser;
+  if(!user){ errEl.textContent = 'Sessão expirada. Entre de novo.'; return; }
+  const btn = document.getElementById('loginPasswordConfirm');
+  btn.disabled = true;
+  try{
+    const cred = firebase.auth.EmailAuthProvider.credential(user.email, atual);
+    await user.reauthenticateWithCredential(cred);
+    await user.updatePassword(nova);
+    closeLoginPasswordModal();
+    showToast('Senha de login alterada com sucesso.');
+  }catch(e){
+    if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential'){
+      errEl.textContent = 'Senha atual incorreta.';
+    }else if(e.code === 'auth/weak-password'){
+      errEl.textContent = 'Senha muito fraca. Use pelo menos 6 caracteres.';
+    }else{
+      errEl.textContent = 'Não foi possível trocar a senha (' + (e.code || e.message) + ').';
+    }
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function openLocationsModal(){
+  const hoje = todayKey();
+  const trintaDiasAtras = (()=>{ const d=new Date(); d.setDate(d.getDate()-30); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); })();
+  document.getElementById('locFrom').value = trintaDiasAtras;
+  document.getElementById('locTo').value = hoje;
+  document.getElementById('locationsList').innerHTML = '';
+  document.getElementById('locationsOverlay').classList.add('show');
+}
+function closeLocationsModal(){
+  document.getElementById('locationsOverlay').classList.remove('show');
+}
+function searchLocations(){
+  const from = document.getElementById('locFrom').value;
+  const to = document.getElementById('locTo').value;
+  const listEl = document.getElementById('locationsList');
+  if(!from || !to){ listEl.innerHTML = '<p class="hint-text">Escolha as duas datas.</p>'; return; }
+  const linhas = [];
+  Object.keys(records).sort().forEach(dateKey=>{
+    if(dateKey < from || dateKey > to) return;
+    const rec = records[dateKey];
+    activeTiposTodos().forEach(tipo=>{
+      const loc = rec[tipo+'Loc'];
+      if(!loc || !rec[tipo]) return;
+      linhas.push({dateKey, tipo, horario:rec[tipo], loc});
+    });
+  });
+  if(linhas.length === 0){
+    listEl.innerHTML = '<p class="hint-text">Nenhuma batida com localização nesse período.</p>';
+    return;
+  }
+  listEl.innerHTML = linhas.map(l=>{
+    const mapsUrl = `https://www.google.com/maps?q=${l.loc.lat},${l.loc.lng}`;
+    return `<div style="border-bottom:1px solid var(--line); padding:8px 0;">
+      <div style="font-family:'Space Mono',monospace; font-size:12px;">${displayDateShort(l.dateKey)} · ${LABELS[l.tipo]} · ${l.horario}</div>
+      <a href="${mapsUrl}" target="_blank" rel="noopener" style="font-size:12px;">Ver no mapa (±${Math.round(l.loc.accuracy)}m)</a>
+    </div>`;
+  }).join('');
+}
+// usado só pela caixinha de localizações: sempre olha os dois formatos de
+// dia (com ou sem almoço), porque o período buscado pode ter dias antigos
+// de antes de virar diarista, ou o contrário.
+function activeTiposTodos(){
+  return TIPOS;
+}
+
+function openPasswordPrompt(){
+  document.getElementById('passwordInput').value = '';
+  document.getElementById('passwordOverlay').classList.add('show');
+}
+function closePasswordPrompt(){
+  document.getElementById('passwordOverlay').classList.remove('show');
+}
+function openForgot(){
+  document.getElementById('forgotQuestionBox').textContent = security && security.question ? security.question : '—';
+  document.getElementById('forgotAnswer').value = '';
+  document.getElementById('forgotOverlay').classList.add('show');
+}
+function closeForgot(){
+  document.getElementById('forgotOverlay').classList.remove('show');
+}
+function openSetup(mode){
+  setupMode = mode;
+  const title = document.getElementById('setupTitle');
+  const hint = document.getElementById('setupHint');
+  if(mode==='initial'){
+    title.textContent = 'Configurar senha';
+    hint.textContent = 'Crie uma senha para proteger os ajustes de ponto, e uma pergunta de segurança para caso esqueça.';
+  }else if(mode==='change'){
+    title.textContent = 'Alterar senha';
+    hint.textContent = 'Defina a nova senha e (se quiser) atualize a pergunta de segurança.';
+  }else{
+    title.textContent = 'Redefinir senha';
+    hint.textContent = 'Resposta confirmada. Defina uma nova senha.';
+  }
+  document.getElementById('setupPassword').value = '';
+  document.getElementById('setupPasswordConfirm').value = '';
+  document.getElementById('setupQuestion').value = security ? (security.question||'') : '';
+  document.getElementById('setupAnswer').value = '';
+  const bioRow = document.getElementById('biometricRow');
+  const bioCheckbox = document.getElementById('setupBiometric');
+  if(supportsWebAuthn()){
+    bioRow.style.display = 'block';
+    bioCheckbox.checked = !!(security && security.biometricEnabled);
+  }else{
+    bioRow.style.display = 'none';
+    bioCheckbox.checked = false;
+  }
+  document.getElementById('setupOverlay').classList.add('show');
+}
+function closeSetup(){
+  document.getElementById('setupOverlay').classList.remove('show');
+}
+
+function requestPasswordThen(action, dateKey){
+  pendingAction = action;
+  pendingEditDate = dateKey || null;
+  if(!security){
+    openSetup('initial');
+    return;
+  }
+  attemptBiometricThenPassword();
+}
+
+async function attemptBiometricThenPassword(){
+  if(security.biometricEnabled && security.biometricCredentialId && supportsWebAuthn()){
+    const ok = await verifyBiometric();
+    if(ok){
+      proceedPendingAction();
+      return;
+    }
+    showToast('Digital não reconhecida. Digite sua senha.');
+  }
+  openPasswordPrompt();
+}
+
+function proceedPendingAction(){
+  const action = pendingAction;
+  const dateKey = pendingEditDate || todayKey();
+  pendingAction = null;
+  pendingEditDate = null;
+  if(action === 'edit'){
+    openEditModal(dateKey);
+  }else if(action === 'changePassword'){
+    openSetup('change');
+  }else if(action === 'delete'){
+    openDeleteJustModal(dateKey);
+  }
+}
+
+let deleteJustDate = null;
+function openDeleteJustModal(key){
+  if(records[key] && records[key].pendingRequest){
+    showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
+    return;
+  }
+  deleteJustDate = key;
+  document.getElementById('deleteJustDateLabel').textContent = `Excluir todos os registros de ${displayDateShort(key)}. Isso também precisa ser aprovado pelo administrador.`;
+  document.getElementById('deleteJustificativa').value = '';
+  document.getElementById('deleteJustOverlay').classList.add('show');
+}
+function closeDeleteJustModal(){
+  document.getElementById('deleteJustOverlay').classList.remove('show');
+}
+async function sendDeleteRequest(){
+  const key = deleteJustDate;
+  const justificativa = document.getElementById('deleteJustificativa').value.trim();
+  if(!justificativa){ showToast('Escreva a justificativa da exclusão.'); return; }
+  const antigo = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false};
+  const backup = records[key] ? {...records[key]} : null;
+  records[key] = { ...antigo, pendingRequest:{ tipo:'exclusao', novo:null, justificativa, criadoEm:new Date().toISOString() } };
+  const saved = await saveRecords();
+  if(!saved){ if(backup){records[key]=backup;}else{delete records[key];} showToast('Não foi possível enviar a solicitação.'); return; }
+  await createSolicitacao({
+    nomeFuncionario: profile ? profile.nome : '',
+    dateKey: key, tipo:'exclusao',
+    antigo: {entrada:antigo.entrada||null, almocoSaida:antigo.almocoSaida||null, almocoVolta:antigo.almocoVolta||null, saida:antigo.saida||null, falta:!!antigo.falta},
+    novo: null,
+    justificativa
+  });
+  closeDeleteJustModal();
+  renderToday();
+  renderHistory();
+  showToast('Solicitação de exclusão enviada. Aguardando aprovação do administrador.', 5000);
+}
+
+async function onPasswordConfirm(){
+  const agora = Date.now();
+  if(agora < senhaBloqueadaAte){
+    const seg = Math.ceil((senhaBloqueadaAte-agora)/1000);
+    showToast(`Muitas tentativas erradas. Aguarde ${seg}s e tente de novo.`, 4000);
+    return;
+  }
+  const typed = document.getElementById('passwordInput').value;
+  if(!typed){ showToast('Digite a senha.'); return; }
+  const hash = await hashText(typed);
+  if(hash !== security.passwordHash){
+    senhaFalhas++;
+    if(senhaFalhas >= 5){
+      senhaBloqueadaAte = Date.now() + 60000; // trava 60s após 5 erros seguidos
+      senhaFalhas = 0;
+      showToast('Muitas tentativas erradas. Bloqueado por 60s.', 5000);
+    }else{
+      showToast('Senha incorreta.');
+    }
+    return;
+  }
+  senhaFalhas = 0;
+  closePasswordPrompt();
+  proceedPendingAction();
+}
+
+async function onForgotVerify(){
+  const typed = document.getElementById('forgotAnswer').value.trim();
+  if(!typed){ showToast('Digite sua resposta.'); return; }
+  const hash = await hashText(typed.toLowerCase());
+  if(hash !== security.answerHash){
+    showToast('Resposta incorreta.');
+    return;
+  }
+  closeForgot();
+  openSetup('reset');
+}
+
+async function onSetupSave(){
+  const p1 = document.getElementById('setupPassword').value;
+  const p2 = document.getElementById('setupPasswordConfirm').value;
+  const question = document.getElementById('setupQuestion').value.trim();
+  const answer = document.getElementById('setupAnswer').value.trim();
+  if(!p1 || p1.length < 4){ showToast('A senha deve ter pelo menos 4 caracteres.'); return; }
+  if(p1 !== p2){ showToast('As senhas não coincidem.'); return; }
+  if(!question || !answer){ showToast('Preencha a pergunta e a resposta de segurança.'); return; }
+  const btn = document.getElementById('setupSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+  const passwordHash = await hashText(p1);
+  const answerHash = await hashText(answer.toLowerCase());
+
+  const wantsBiometric = document.getElementById('setupBiometric').checked;
+  let biometricEnabled = false;
+  let biometricCredentialId = security ? security.biometricCredentialId||null : null;
+  if(wantsBiometric && supportsWebAuthn()){
+    const credId = await registerBiometric();
+    if(credId){
+      biometricEnabled = true;
+      biometricCredentialId = credId;
+    }else{
+      showToast('Não foi possível ativar a digital. Senha salva normalmente.');
+    }
+  }
+
+  const ok = await saveSecurity({passwordHash, question, answerHash, biometricEnabled, biometricCredentialId});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
+  if(!ok) return;
+  closeSetup();
+  showToast('Senha salva com sucesso.');
+  if(pendingAction === 'edit' || pendingAction === 'delete'){
+    proceedPendingAction();
+  }else{
+    pendingAction = null;
+    pendingEditDate = null;
+  }
+}
+
+// --- edição manual ---
+function openEditModal(dateKey){
+  const key = dateKey || todayKey();
+  if(records[key] && records[key].pendingRequest){
+    showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
+    return;
+  }
+  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  document.getElementById('editDate').value = key;
+  document.getElementById('editEntrada').value = (rec.entrada||'').slice(0,5);
+  document.getElementById('editAlmocoSaida').value = (rec.almocoSaida||'').slice(0,5);
+  document.getElementById('editAlmocoVolta').value = (rec.almocoVolta||'').slice(0,5);
+  document.getElementById('editSaida').value = (rec.saida||'').slice(0,5);
+  document.getElementById('editFalta').checked = !!rec.falta;
+  document.getElementById('editJustificativa').value = '';
+  toggleEditFaltaFields();
+  document.getElementById('editModalOverlay').classList.add('show');
+}
+function closeEditModal(){
+  document.getElementById('editModalOverlay').classList.remove('show');
+}
+function toggleEditFaltaFields(){
+  const disabled = document.getElementById('editFalta').checked;
+  ['editEntrada','editAlmocoSaida','editAlmocoVolta','editSaida'].forEach(id=>{
+    document.getElementById(id).disabled = disabled;
+  });
+}
+function loadRecordIntoEditForm(key){
+  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  document.getElementById('editEntrada').value = (rec.entrada||'').slice(0,5);
+  document.getElementById('editAlmocoSaida').value = (rec.almocoSaida||'').slice(0,5);
+  document.getElementById('editAlmocoVolta').value = (rec.almocoVolta||'').slice(0,5);
+  document.getElementById('editSaida').value = (rec.saida||'').slice(0,5);
+  document.getElementById('editFalta').checked = !!rec.falta;
+  toggleEditFaltaFields();
+}
+async function saveManualEdit(){
+  const key = document.getElementById('editDate').value;
+  if(!key){ showToast('Selecione uma data válida.'); return; }
+  const justificativa = document.getElementById('editJustificativa').value.trim();
+  if(!justificativa){ showToast('Escreva a justificativa do ajuste.'); return; }
+  const falta = document.getElementById('editFalta').checked;
+  let novo;
+  if(falta){
+    novo = {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:true};
+  }else{
+    const vals = {
+      entrada: document.getElementById('editEntrada').value,
+      almocoSaida: document.getElementById('editAlmocoSaida').value,
+      almocoVolta: document.getElementById('editAlmocoVolta').value,
+      saida: document.getElementById('editSaida').value,
+    };
+    novo = {falta:false};
+    TIPOS.forEach(t=>{ novo[t] = vals[t] ? vals[t]+':00' : null; });
+  }
+  const atual = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false};
+  const antigo = {entrada:atual.entrada||null, almocoSaida:atual.almocoSaida||null, almocoVolta:atual.almocoVolta||null, saida:atual.saida||null, falta:!!atual.falta};
+  const backup = records[key] ? {...records[key]} : null;
+  // O valor batido continua igual — só grava que existe um pedido pendente
+  // esperando o administrador aprovar.
+  records[key] = { ...atual, pendingRequest:{ tipo:'edicao', novo, justificativa, criadoEm:new Date().toISOString() } };
+
+  const btn = document.getElementById('editSave');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  const ok = await saveRecords();
+  if(!ok){
+    if(backup){ records[key] = backup; } else { delete records[key]; }
+    btn.disabled = false;
+    btn.textContent = 'Enviar para aprovação';
+    return;
+  }
+  await createSolicitacao({
+    nomeFuncionario: profile ? profile.nome : '',
+    dateKey: key, tipo:'edicao', antigo, novo, justificativa
+  });
+  btn.disabled = false;
+  btn.textContent = 'Enviar para aprovação';
+  renderToday();
+  renderHistory();
+  closeEditModal();
+  showToast(`Solicitação enviada para ${displayDateShort(key)}. Aguardando aprovação do administrador.`, 5000);
+}
+
+// --- fechamento do mês / remuneração ---
+function toggleCLTFields(){
+  const isCLT = document.getElementById('pIsCLT').checked;
+  document.getElementById('cltFields').style.display = isCLT ? 'block' : 'none';
+}
+function toggleVTFields(){
+  const ativo = document.getElementById('pVTAtivo').checked;
+  document.getElementById('vtFields').style.display = ativo ? 'block' : 'none';
+}
+function openPayrollSetup(){
+  document.getElementById('pSalario').value = payroll ? payroll.salario : '';
+  document.getElementById('pVA').value = payroll ? payroll.va : '';
+  document.getElementById('pVC').value = payroll ? payroll.vc : '';
+  document.getElementById('pIsCLT').checked = !!(payroll && payroll.isCLT);
+  document.getElementById('pVTAtivo').checked = !!(payroll && payroll.vtAtivo);
+  document.getElementById('pVTValorDia').value = payroll && payroll.vtValorDia ? payroll.vtValorDia : '';
+  document.getElementById('pVTPercentual').value = payroll && payroll.vtPercentual ? payroll.vtPercentual : '';
+  toggleCLTFields();
+  toggleVTFields();
+  document.getElementById('payrollSetupOverlay').classList.add('show');
+}
+function closePayrollSetup(){
+  document.getElementById('payrollSetupOverlay').classList.remove('show');
+}
+async function onPayrollSetupSave(){
+  const salario = parseFloat(document.getElementById('pSalario').value);
+  const va = parseFloat(document.getElementById('pVA').value) || 0;
+  const vc = parseFloat(document.getElementById('pVC').value) || 0;
+  const isCLT = document.getElementById('pIsCLT').checked;
+  const vtAtivo = isCLT && document.getElementById('pVTAtivo').checked;
+  const vtValorDia = vtAtivo ? (parseFloat(document.getElementById('pVTValorDia').value) || 0) : 0;
+  const vtPercentual = vtAtivo ? (parseFloat(document.getElementById('pVTPercentual').value) || 0) : 0;
+  if(!salario || salario<=0){ showToast('Informe um salário válido.'); return; }
+  if(vtAtivo && (!vtValorDia || !vtPercentual)){ showToast('Preencha o valor do vale transporte e o percentual descontado.'); return; }
+  const btn = document.getElementById('payrollSetupSave');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+  const ok = await savePayroll({salario, va, vc, isCLT, vtAtivo, vtValorDia, vtPercentual});
+  btn.disabled = false;
+  btn.textContent = 'Salvar';
+  if(!ok) return;
+  closePayrollSetup();
+  showToast('Dados de remuneração salvos.');
+  openPayrollSummary();
+}
+
+// Tabela INSS 2026 (progressiva): faixa;alíquota
+function calcINSS(salarioBase){
+  const faixas = [
+    {ate: 1621.00, aliq: 0.075},
+    {ate: 2902.84, aliq: 0.09},
+    {ate: 4354.27, aliq: 0.12},
+    {ate: 8475.55, aliq: 0.14},
+  ];
+  const base = Math.min(salarioBase, 8475.55);
+  let total = 0, anterior = 0;
+  for(const f of faixas){
+    if(base > anterior){
+      const faixaValor = Math.min(base, f.ate) - anterior;
+      if(faixaValor > 0) total += faixaValor * f.aliq;
+      anterior = f.ate;
+    }else break;
+  }
+  return Math.round(total * 100) / 100;
+}
+function calcFGTS(salarioBase){
+  return Math.round(salarioBase * 0.08 * 100) / 100;
+}
+function calcDescontoVT(salarioBase, valorMesVT, percentual){
+  const limite = salarioBase * (percentual/100);
+  return Math.round(Math.min(limite, valorMesVT) * 100) / 100;
+}
+
+function diasTrabalhadosNoMes(mk){
+  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].entrada && !records[k].falta).length;
+}
+function diasUteisNoMes(mk){
+  const [y,m] = mk.split('-').map(Number);
+  const diasNoMes = new Date(y, m, 0).getDate();
+  let count = 0;
+  for(let d=1; d<=diasNoMes; d++){
+    const dow = new Date(y, m-1, d).getDay(); // 0=domingo ... 6=sábado
+    if(dow>=1 && dow<=5) count++;
+  }
+  return count;
+}
+function faltasNoMes(mk){
+  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].falta).length;
+}
+
+function computePayrollBreakdown(mk){
+  const diasUteis = diasUteisNoMes(mk);
+  const dias = diasTrabalhadosNoMes(mk);
+  const faltas = faltasNoMes(mk);
+  const diaValor = payroll.salario / diasUteis;
+  let salarioMes = diaValor * dias;
+  if(dias >= diasUteis) salarioMes = payroll.salario;
+  const vaMes = payroll.va * dias;
+  const vcMes = payroll.vc * dias;
+
+  let extraMesMins = 0;
+  Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
+    const t = calcTotal(records[k]);
+    if(t && !t.falta) extraMesMins += t.extraMins;
+  });
+
+  const out = { diasUteis, dias, faltas, salarioMes, vaMes, vcMes, extraMesMins, isCLT: !!payroll.isCLT };
+
+  if(payroll.isCLT){
+    out.inss = calcINSS(salarioMes);
+    out.fgts = calcFGTS(salarioMes);
+    if(payroll.vtAtivo){
+      const vtMes = payroll.vtValorDia * dias;
+      out.vtMes = vtMes;
+      out.descontoVT = calcDescontoVT(salarioMes, vtMes, payroll.vtPercentual);
+    }else{
+      out.vtMes = 0;
+      out.descontoVT = 0;
+    }
+    out.salarioLiquido = salarioMes - out.inss - out.descontoVT;
+    out.totalMes = out.salarioLiquido + vaMes + vcMes;
+  }else{
+    out.totalMes = salarioMes + vaMes + vcMes;
+  }
+  return out;
+}
+
+function openPayrollSummary(){
+  if(!payroll){ openPayrollSetup(); return; }
+  const mk = viewMonth;
+  const b = computePayrollBreakdown(mk);
+
+  document.getElementById('payrollTitle').textContent = `Fechamento — ${monthLabelOf(mk)}`;
+  document.getElementById('payrollReceipt').innerHTML = `
+    <div class="receipt-row"><span class="r-label">Dias úteis no mês (seg. a sex.)</span><span class="r-value">${b.diasUteis}</span></div>
+    <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${b.dias} de ${b.diasUteis}</span></div>
+    <div class="receipt-row"><span class="r-label">Faltas registradas</span><span class="r-value">${b.faltas}</span></div>
+    <div class="receipt-row"><span class="r-label">Salário bruto (proporcional)</span><span class="r-value">${formatBRL(b.salarioMes)}</span></div>
+    ${b.isCLT ? `
+    <div class="receipt-row"><span class="r-label">INSS (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.inss)}</span></div>
+    ${b.descontoVT>0 ? `<div class="receipt-row"><span class="r-label">Vale Transporte (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.descontoVT)}</span></div>` : ''}
+    <div class="receipt-row"><span class="r-label">Salário líquido</span><span class="r-value">${formatBRL(b.salarioLiquido)}</span></div>
+    ` : ''}
+    <div class="receipt-row"><span class="r-label">Vale Alimentação</span><span class="r-value">${formatBRL(b.vaMes)}</span></div>
+    <div class="receipt-row"><span class="r-label">Vale Combustível</span><span class="r-value">${formatBRL(b.vcMes)}</span></div>
+    <div class="receipt-row total"><span class="r-label">Total do mês (a receber)</span><span class="r-value">${formatBRL(b.totalMes)}</span></div>
+    ${b.isCLT ? `<div class="receipt-row"><span class="r-label">FGTS depositado (informativo)</span><span class="r-value">${formatBRL(b.fgts)}</span></div>` : ''}
+    ${b.extraMesMins>0 ? `<div class="receipt-row"><span class="r-label">Hora extra no mês</span><span class="r-value" style="color:var(--stamp-red);">${formatMinutes(b.extraMesMins)}</span></div>` : ''}
+    <div class="receipt-note">Dias úteis calculados automaticamente pelo calendário (segunda a sexta). Hora extra é apenas informativa: não entra na conta do salário, pois não é remunerada.${b.isCLT ? ' INSS calculado pela tabela progressiva vigente; FGTS é depositado pelo empregador e não é descontado do seu salário.' : ''}</div>
+  `;
+  document.getElementById('payrollOverlay').classList.add('show');
+}
+function closePayrollSummary(){
+  document.getElementById('payrollOverlay').classList.remove('show');
+}
+
+function maybeAutoShowPayroll(){
+  const d = new Date();
+  if(d.getDate() >= 30 && payroll){
+    const flagKey = 'ponto-payroll-shown-'+todayKey();
+    if(!sessionStorage.getItem(flagKey)){
+      sessionStorage.setItem(flagKey, '1');
+      openPayrollSummary();
+    }
+  }
+}
+
+// --- histórico por mês ---
+function renderHistory(){
+  document.getElementById('monthLabel').textContent = monthLabelOf(viewMonth);
+  const tbody = document.getElementById('tbody');
+  const keys = Object.keys(records).filter(k=>monthKeyOf(k)===viewMonth).sort().reverse();
+
+  let totalMins = 0;
+  let totalExtraMins = 0;
+  keys.forEach(k=>{
+    const tot = calcTotal(records[k]);
+    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+  });
+  const th = Math.floor(totalMins/60), tm = totalMins%60;
+  document.getElementById('monthTotal').textContent = keys.length
+    ? `${keys.length} dia(s) · total ${th}h${pad(tm)}` + (totalExtraMins>0 ? ` · extra ${formatMinutes(totalExtraMins)}` : '')
+    : 'nenhum registro neste mês';
+
+  if(keys.length===0){
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Nenhum registro neste mês.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = keys.map(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    if(tot && tot.falta){
+      return `<tr>
+        <td>${displayDateShort(key)}</td>
+        <td colspan="4" style="text-align:center;color:var(--stamp-red);font-weight:700;letter-spacing:1px;">FALTA${rec.pendingRequest?' ⏳':''}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn edit" data-key="${key}" title="Editar (senha)">✎</button>
+            <button class="icon-btn del" data-key="${key}" title="Excluir dia (senha)">✕</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+    return `<tr>
+      <td>${displayDateShort(key)}${rec.pendingRequest?' <span title="Ajuste pendente de aprovação">⏳</span>':''}</td>
+      <td>${rec.entrada||'—'}</td>
+      <td>${rec.almocoSaida||'—'}</td>
+      <td>${rec.almocoVolta||'—'}</td>
+      <td>${rec.saida||'—'}</td>
+      <td>${tot?tot.text:'—'}</td>
+      <td>${tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : '—'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn edit" data-key="${key}" title="Editar (senha)">✎</button>
+          <button class="icon-btn del" data-key="${key}" title="Excluir dia (senha)">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.icon-btn.edit').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      requestPasswordThen('edit', btn.dataset.key);
+    });
+  });
+  tbody.querySelectorAll('.icon-btn.del').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      requestPasswordThen('delete', btn.dataset.key);
+    });
+  });
+  renderFullscreen();
+}
+
+function renderFullscreen(){
+  const mk = viewMonth;
+  document.getElementById('fsMonthLabel').textContent = monthLabelOf(mk);
+  const keys = Object.keys(records).filter(k=>monthKeyOf(k)===mk).sort();
+  let totalMins = 0, totalExtraMins = 0;
+  keys.forEach(k=>{
+    const tot = calcTotal(records[k]);
+    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+  });
+  const th = Math.floor(totalMins/60), tm = totalMins%60;
+  document.getElementById('fsMonthTotal').textContent = keys.length
+    ? `${keys.length} dia(s) · total ${th}h${pad(tm)}` + (totalExtraMins>0 ? ` · extra ${formatMinutes(totalExtraMins)}` : '')
+    : 'nenhum registro neste mês';
+
+  const body = document.getElementById('fsBody');
+  if(keys.length===0){
+    body.innerHTML = '<div class="fs-empty">Nenhum registro neste mês.</div>';
+    return;
+  }
+  body.innerHTML = keys.map(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    if(tot && tot.falta){
+      return `<div class="fs-card">
+        <div class="fs-card-date">${displayDate(key)} <span class="fs-card-falta">FALTA</span></div>
+      </div>`;
+    }
+    return `<div class="fs-card">
+      <div class="fs-card-date">${displayDate(key)}</div>
+      <div class="fs-grid">
+        <div><div class="fs-lbl">Entrada</div><div class="fs-val">${rec.entrada||'—'}</div></div>
+        <div><div class="fs-lbl">S. Almoço</div><div class="fs-val">${rec.almocoSaida||'—'}</div></div>
+        <div><div class="fs-lbl">V. Almoço</div><div class="fs-val">${rec.almocoVolta||'—'}</div></div>
+        <div><div class="fs-lbl">Saída</div><div class="fs-val">${rec.saida||'—'}</div></div>
+      </div>
+      <div class="fs-totals">
+        <span>Total: <strong>${tot?tot.text:'—'}${tot && !tot.complete ? ' (parcial)' : ''}</strong></span>
+        ${tot && tot.extraMins>0 ? `<span class="extra">Extra: ${formatMinutes(tot.extraMins)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openFullscreen(){
+  document.getElementById('fullscreenOverlay').classList.add('show');
+  renderFullscreen();
+}
+function closeFullscreen(){
+  document.getElementById('fullscreenOverlay').classList.remove('show');
+}
+
+function tickClock(){
+  document.getElementById('clock').textContent = nowTime();
+}
+
+function authEmailToDisplay(email){
+  if(!email) return '—';
+  const m = email.match(/^cpf(\d{11})@pontoapp\.local$/);
+  if(m){
+    const d = m[1];
+    return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9,11)} (CPF)`;
+  }
+  return email;
+}
+function openDrawer(){
+  const email = auth.currentUser ? auth.currentUser.email : '';
+  document.getElementById('drawerAccountEmail').textContent = authEmailToDisplay(email);
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+function closeDrawer(){
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+
+function buildReportRows(){
+  const keys = Object.keys(records).sort();
+  return keys.map(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    return {key, rec, tot, isFalta: !!(tot && tot.falta)};
+  });
+}
+
+function payrollBreakdownPairs(mk){
+  if(!payroll) return null;
+  const b = computePayrollBreakdown(mk);
+  const pairs = [
+    ['Dias úteis no mês', String(b.diasUteis)],
+    ['Dias trabalhados', `${b.dias} de ${b.diasUteis}`],
+    ['Faltas registradas', String(b.faltas)],
+    ['Salário bruto (proporcional)', formatBRL(b.salarioMes)],
+  ];
+  if(b.isCLT){
+    pairs.push(['INSS (desconto)', '-' + formatBRL(b.inss)]);
+    if(b.descontoVT>0) pairs.push(['Vale Transporte (desconto)', '-' + formatBRL(b.descontoVT)]);
+    pairs.push(['Salário líquido', formatBRL(b.salarioLiquido)]);
+  }
+  pairs.push(['Vale Alimentação', formatBRL(b.vaMes)]);
+  pairs.push(['Vale Combustível', formatBRL(b.vcMes)]);
+  pairs.push(['Total do mês (a receber)', formatBRL(b.totalMes)]);
+  if(b.isCLT) pairs.push(['FGTS depositado (informativo)', formatBRL(b.fgts)]);
+  return pairs;
+}
+
+async function exportA4(){
+  const rows = buildReportRows();
+  if(rows.length===0){ showToast('Não há registros para exportar.'); return; }
+  const includePayroll = payroll ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
+  const nome = profile && profile.nome ? profile.nome : 'Não informado';
+  const win = window.open('', '_blank');
+  if(!win){ showToast('Permita pop-ups no navegador para exportar em A4.', 4000); return; }
+  const bodyRows = rows.map(({key, rec, tot, isFalta})=>{
+    if(isFalta){
+      return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">FALTA</td><td>—</td><td>—</td></tr>`;
+    }
+    return `<tr>
+      <td>${displayDateShort(key)}</td>
+      <td>${rec.entrada||'—'}</td>
+      <td>${rec.almocoSaida||'—'}</td>
+      <td>${rec.almocoVolta||'—'}</td>
+      <td>${rec.saida||'—'}</td>
+      <td>${tot?tot.text:'—'}</td>
+      <td>${tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : '—'}</td>
+    </tr>`;
+  }).join('');
+  let payrollSection = '';
+  if(includePayroll){
+    const pairs = payrollBreakdownPairs(viewMonth);
+    payrollSection = `
+      <h2 style="font-size:15px;margin:24px 0 8px;">Pagamento — ${monthLabelOf(viewMonth)}</h2>
+      <table style="max-width:420px;">
+        ${pairs.map(([l,v])=>`<tr><td>${l}</td><td>${v}</td></tr>`).join('')}
+      </table>
+    `;
+  }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Controle de Ponto</title>
+    <style>
+      @page{ size:A4; margin:16mm; }
+      body{ font-family:Arial, Helvetica, sans-serif; color:#111; margin:0; }
+      h1{ font-size:20px; margin:0 0 2px; }
+      .sub{ font-size:12px; color:#555; margin-bottom:18px; }
+      table{ width:100%; border-collapse:collapse; font-size:12px; }
+      th, td{ border:1px solid #999; padding:6px 8px; text-align:left; }
+      th{ background:#111; color:#fff; }
+      tr:nth-child(even){ background:#f5f5f5; }
+    </style></head><body>
+      <h1>Controle de Ponto — ${nome}</h1>
+      <div class="sub">Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
+      <table>
+        <thead><tr><th>Data</th><th>Entrada</th><th>Saída Almoço</th><th>Volta Almoço</th><th>Saída</th><th>Total</th><th>Hora Extra</th></tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      ${payrollSection}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{ try{ win.print(); }catch(e){ /* usuário pode imprimir manualmente */ } }, 300);
+}
+
+async function exportExcel(){
+  const rows = buildReportRows();
+  if(rows.length===0){ showToast('Não há registros para exportar.'); return; }
+  const includePayroll = payroll ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
+  const nome = profile && profile.nome ? profile.nome : 'Não informado';
+  const bodyRows = rows.map(({key, rec, tot, isFalta})=>{
+    if(isFalta){
+      return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">FALTA</td><td></td><td></td></tr>`;
+    }
+    return `<tr>
+      <td>${displayDateShort(key)}</td>
+      <td>${rec.entrada||''}</td>
+      <td>${rec.almocoSaida||''}</td>
+      <td>${rec.almocoVolta||''}</td>
+      <td>${rec.saida||''}</td>
+      <td>${tot?tot.text:''}</td>
+      <td>${tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : ''}</td>
+    </tr>`;
+  }).join('');
+  let payrollRows = '';
+  if(includePayroll){
+    const pairs = payrollBreakdownPairs(viewMonth);
+    payrollRows = `
+      <tr><td colspan="7"></td></tr>
+      <tr><td colspan="7" style="font-weight:bold;">Pagamento — ${monthLabelOf(viewMonth)}</td></tr>
+      ${pairs.map(([l,v])=>`<tr><td>${l}</td><td>${v}</td></tr>`).join('')}
+    `;
+  }
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8"></head><body>
+      <table border="1">
+        <tr><td colspan="7" style="font-weight:bold;">Funcionário</td></tr>
+        <tr><td colspan="7">${nome}</td></tr>
+        <tr><td colspan="7"></td></tr>
+        <tr style="background:#111;color:#fff;font-weight:bold;">
+          <td>Data</td><td>Entrada</td><td>Saída Almoço</td><td>Volta Almoço</td><td>Saída</td><td>Total</td><td>Hora Extra</td>
+        </tr>
+        ${bodyRows}
+        ${payrollRows}
+      </table>
+    </body></html>`;
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'controle_de_ponto.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Lê o mesmo formato de CSV que o app exporta (Data;Entrada;Saida Almoco;
+// Volta Almoco;Saida;Total;Hora Extra;Falta) e junta com os dias que já
+// existem, sem apagar nada que já está salvo.
+function parseCSVLine(line){
+  return line.split(';').map(c=>c.trim());
+}
+async function importCSVFile(file){
+  let text;
+  try{
+    text = await file.text();
+  }catch(e){
+    showToast('Não foi possível ler o arquivo.', 4000);
+    return;
+  }
+  const cleanText = text.replace(/^\uFEFF/, '');
+  const lines = cleanText.split(/\r?\n/).filter(l=>l.trim().length>0);
+  const headerIdx = lines.findIndex(l=>l.trim().toLowerCase().startsWith('data;'));
+  if(headerIdx === -1){
+    showToast('Não reconheci o formato desse CSV. Use um arquivo exportado pelo próprio app.', 5000);
+    return;
+  }
+  let imported = 0, skipped = 0;
+  for(let i=headerIdx+1; i<lines.length; i++){
+    const cols = parseCSVLine(lines[i]);
+    if(cols.length < 5){ skipped++; continue; }
+    const [dataStr, entrada, almocoSaida, almocoVolta, saida, , , falta] = cols;
+    const m = dataStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m){ skipped++; continue; }
+    const key = `${m[3]}-${m[2]}-${m[1]}`;
+    if(falta && falta.trim().toUpperCase()==='SIM'){
+      records[key] = {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:true};
+    }else{
+      const norm = (t)=>{
+        if(!t) return null;
+        const tt = t.trim();
+        if(!tt) return null;
+        return tt.length===5 ? tt+':00' : tt;
+      };
+      records[key] = {
+        entrada: norm(entrada),
+        almocoSaida: norm(almocoSaida),
+        almocoVolta: norm(almocoVolta),
+        saida: norm(saida),
+        falta: false
+      };
+    }
+    imported++;
+  }
+  if(imported===0){
+    showToast('Nenhum registro válido encontrado no arquivo.', 4000);
+    return;
+  }
+  const ok = await saveRecords();
+  if(!ok) return;
+  renderToday();
+  renderHistory();
+  showToast(`${imported} dia(s) importado(s)` + (skipped ? `, ${skipped} linha(s) ignorada(s).` : '.'), 4000);
+}
+
+function exportCSV(){
+  const keys = Object.keys(records).sort();
+  if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
+  let csv = 'Funcionario;' + (profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
+  keys.forEach(key=>{
+    const rec = records[key];
+    const tot = calcTotal(rec);
+    if(tot && tot.falta){
+      csv += [displayDateShort(key), '', '', '', '', '', '', 'SIM'].join(';') + '\n';
+    }else{
+      csv += [displayDateShort(key), rec.entrada||'', rec.almocoSaida||'', rec.almocoVolta||'', rec.saida||'', tot?tot.text:'', tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : '', ''].join(';') + '\n';
+    }
+  });
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'controle_de_ponto.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+on('punchBtn', 'click', handlePunch);
+on('editManualBtn', 'click', ()=>requestPasswordThen('edit', todayKey()));
+on('nameCancel', 'click', closeNamePrompt);
+on('nameSave', 'click', onNameSave);
+
+on('passwordConfirm', 'click', onPasswordConfirm);
+on('passwordCancel', 'click', closePasswordPrompt);
+on('forgotPasswordLink', 'click', ()=>{ closePasswordPrompt(); openForgot(); });
+on('forgotCancel', 'click', closeForgot);
+on('forgotVerify', 'click', onForgotVerify);
+on('setupCancel', 'click', ()=>{ closeSetup(); pendingAction=null; pendingEditDate=null; });
+on('setupSave', 'click', onSetupSave);
+
+on('editCancel', 'click', closeEditModal);
+on('editSave', 'click', saveManualEdit);
+on('deleteJustCancel', 'click', closeDeleteJustModal);
+on('deleteJustSend', 'click', sendDeleteRequest);
+on('editDate', 'change', (e)=>loadRecordIntoEditForm(e.target.value));
+on('editFalta', 'change', toggleEditFaltaFields);
+
+on('payrollSetupCancel', 'click', closePayrollSetup);
+on('payrollSetupSave', 'click', onPayrollSetupSave);
+on('pIsCLT', 'change', toggleCLTFields);
+on('pVTAtivo', 'change', toggleVTFields);
+on('payrollClose', 'click', closePayrollSummary);
+on('payrollEditData', 'click', ()=>{ closePayrollSummary(); openPayrollSetup(); });
+
+// --- menu lateral (☰) ---
+on('menuBtn', 'click', openDrawer);
+on('drawerCloseBtn', 'click', closeDrawer);
+on('drawerOverlay', 'click', (e)=>{ if(e.target.id==='drawerOverlay') closeDrawer(); });
+on('menuLoginPasswordBtn', 'click', ()=>{ closeDrawer(); openLoginPasswordModal(); });
+on('loginPasswordCancel', 'click', closeLoginPasswordModal);
+on('loginPasswordConfirm', 'click', onLoginPasswordConfirm);
+on('menuLocationsBtn', 'click', ()=>{ closeDrawer(); openLocationsModal(); });
+on('locationsCancel', 'click', closeLocationsModal);
+on('locationsSearch', 'click', searchLocations);
+on('menuEditNameBtn', 'click', ()=>{ closeDrawer(); openNamePrompt(); });
+on('menuPasswordBtn', 'click', ()=>{ closeDrawer(); requestPasswordThen('changePassword'); });
+on('menuPayrollSetupBtn', 'click', ()=>{ closeDrawer(); openPayrollSetup(); });
+on('menuPayrollSummaryBtn', 'click', ()=>{ closeDrawer(); openPayrollSummary(); });
+on('menuExportCsvBtn', 'click', ()=>{ closeDrawer(); exportCSV(); });
+on('menuImportCsvBtn', 'click', ()=>{ closeDrawer(); document.getElementById('importCsvInput').click(); });
+on('importCsvInput', 'change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  await importCSVFile(file);
+});
+on('menuExportA4Btn', 'click', ()=>{ closeDrawer(); exportA4(); });
+on('menuExportExcelBtn', 'click', ()=>{ closeDrawer(); exportExcel(); });
+on('menuLogoutBtn', 'click', ()=>{ closeDrawer(); onLogout(); });
+on('menuSwitchAccountBtn', 'click', ()=>{ closeDrawer(); onLogout(); });
+
+const daysBtn = document.getElementById('daysBtn');
+const daysPanel = document.getElementById('daysPanel');
+daysBtn.addEventListener('click', ()=>{
+  const showing = daysPanel.classList.toggle('show');
+  daysBtn.classList.toggle('active', showing);
+  daysBtn.textContent = showing ? 'Ocultar dias trabalhados' : 'Ver dias trabalhados';
+});
+document.getElementById('prevMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, -1);
+  renderHistory();
+});
+document.getElementById('nextMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, 1);
+  renderHistory();
+});
+document.getElementById('fullscreenBtn').addEventListener('click', openFullscreen);
+document.getElementById('fsCloseBtn').addEventListener('click', closeFullscreen);
+document.getElementById('fsPrevMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, -1);
+  renderHistory();
+});
+document.getElementById('fsNextMonthBtn').addEventListener('click', ()=>{
+  viewMonth = shiftMonth(viewMonth, 1);
+  renderHistory();
+});
+
+let idType = 'email'; // 'email' ou 'cpf'
+
+function clearAuthFields(){
+  document.getElementById('authIdentifier').value = '';
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authError').textContent = '';
+}
+function showAuthOverlay(){
+  document.getElementById('authOverlay').classList.add('show');
+}
+function hideAuthOverlay(){
+  document.getElementById('authOverlay').classList.remove('show');
+  clearAuthFields();
+}
+function setIdType(type){
+  idType = type;
+  const input = document.getElementById('authIdentifier');
+  const label = document.getElementById('authIdentifierLabel');
+  document.getElementById('idTypeEmailBtn').classList.toggle('active', type==='email');
+  document.getElementById('idTypeCpfBtn').classList.toggle('active', type==='cpf');
+  document.getElementById('authError').textContent = '';
+  input.value = '';
+  if(type === 'cpf'){
+    label.textContent = 'CPF';
+    input.setAttribute('inputmode','numeric');
+    input.setAttribute('placeholder','Somente números');
+    input.setAttribute('autocomplete','off');
+    input.setAttribute('maxlength','14');
+  }else{
+    label.textContent = 'E-mail';
+    input.setAttribute('inputmode','email');
+    input.setAttribute('placeholder','seu@email.com');
+    input.setAttribute('autocomplete','username');
+    input.removeAttribute('maxlength');
+  }
+}
+function isValidCPF(cpf){
+  const s = cpf.replace(/\D/g,'');
+  if(s.length !== 11 || /^(\d)\1{10}$/.test(s)) return false;
+  let soma = 0;
+  for(let i=0;i<9;i++) soma += parseInt(s[i]) * (10-i);
+  let resto = (soma*10) % 11;
+  if(resto===10) resto=0;
+  if(resto !== parseInt(s[9])) return false;
+  soma = 0;
+  for(let i=0;i<10;i++) soma += parseInt(s[i]) * (11-i);
+  resto = (soma*10) % 11;
+  if(resto===10) resto=0;
+  return resto === parseInt(s[10]);
+}
+// Firebase Auth exige formato de e-mail; quando a pessoa escolhe CPF,
+// convertemos por baixo dos panos pra um "e-mail" interno único.
+function identifierToAuthEmail(type, value){
+  if(type === 'cpf'){
+    const digits = value.replace(/\D/g,'');
+    return `cpf${digits}@pontoapp.local`;
+  }
+  return value.trim();
+}
+// Não existe mais tela de cadastro — a conta e a senha inicial são
+// criadas pelo ADM no painel dele. Aqui só se entra com o que já existe.
+async function onAuthSubmit(){
+  const raw = document.getElementById('authIdentifier').value.trim();
+  const senha = document.getElementById('authPassword').value;
+  const errorEl = document.getElementById('authError');
+  const idLabel = idType === 'cpf' ? 'CPF' : 'e-mail';
+  if(!raw || !senha){ errorEl.textContent = `Preencha ${idLabel} e senha.`; return; }
+  if(idType === 'cpf' && !isValidCPF(raw)){ errorEl.textContent = 'CPF inválido.'; return; }
+  const authEmail = identifierToAuthEmail(idType, raw);
+  errorEl.textContent = '';
+  const btn = document.getElementById('authSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  try{
+    await auth.signInWithEmailAndPassword(authEmail, senha);
+  }catch(e){
+    if(e.code === 'auth/invalid-email'){
+      errorEl.textContent = idType==='cpf' ? 'CPF inválido.' : 'E-mail inválido.';
+    }else if(e.code === 'auth/network-request-failed'){
+      errorEl.textContent = 'Sem conexão com a internet. Verifique e tente de novo.';
+    }else if(e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential'){
+      errorEl.textContent = 'Conta não encontrada. Peça ao administrador para criar seu acesso.';
+    }else{
+      errorEl.textContent = idType==='cpf' ? 'CPF ou senha incorretos.' : 'E-mail ou senha incorretos.';
+    }
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+}
+async function onLogout(){
+  await auth.signOut();
+}
+
+let appStarted = false;
+async function startApp(){
+  if(appStarted) return;
+  appStarted = true;
+  viewMonth = todayKey().slice(0,7);
+  // O relógio e a data de hoje não dependem de nada salvo — aparecem na hora,
+  // mesmo que o carregamento dos dados esteja demorando ou falhando.
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // Fase 1: mostra na hora o que já estava salvo neste aparelho da última
+  // vez, sem esperar a rede — deixa o app responsivo desde o primeiro instante.
+  hydrateFromCache();
+  renderProfile();
+  renderToday();
+  renderHistory();
+
+  // Fase 2: busca a versão mais atual no servidor (em paralelo, não em
+  // sequência) e atualiza a tela de novo se algo tiver mudado.
+  await Promise.all([loadRecords(), loadSecurity(), loadPayroll(), loadProfile()]);
+  const authEmailAtual = auth.currentUser ? auth.currentUser.email : '';
+  await ensureEmployeeDoc(profile ? profile.nome : '', authEmailAtual);
+  renderProfile();
+  renderToday();
+  renderHistory();
+  if(isDemitido()){
+    showToast('Seu acesso para bater ponto foi encerrado. Fale com o responsável.', 8000);
+  }else if(!temCadastroLiberado()){
+    showToast('Seu cadastro ainda não foi liberado pelo administrador.', 8000);
+  }
+  if(!profile){
+    openNamePrompt();
+  }
+  if(!payroll){
+    openPayrollSetup();
+  }else{
+    maybeAutoShowPayroll();
+  }
+  if('serviceWorker' in navigator){
+    try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ /* opcional */ }
+  }
+}
+
+document.getElementById('authSubmit').addEventListener('click', onAuthSubmit);
+document.getElementById('authPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') onAuthSubmit(); });
+document.getElementById('idTypeEmailBtn').addEventListener('click', ()=>setIdType('email'));
+document.getElementById('idTypeCpfBtn').addEventListener('click', ()=>setIdType('cpf'));
+
+auth.onAuthStateChanged((user)=>{
+  if(user){
+    hideAuthOverlay();
+    startApp();
+  }else{
+    appStarted = false;
+    records = {}; security = null; payroll = null; profile = null;
+    showAuthOverlay();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ponto Digital · Painel ADM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+:root{
+  --bg:#FFFFFF; --paper:#FFFFFF; --paper-dark:#F2F2F2; --ink:#111111;
+  --muted:#5C5C5C; --line:#CFCFCF; --confirm-green:#2E6B3E; --stamp-red:#A13636;
+}
+*{box-sizing:border-box;}
+body{margin:0; font-family:'Inter',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; padding:24px 16px 60px;}
+.wrap{max-width:960px; margin:0 auto;}
+h1{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:1px; font-size:26px; border-bottom:2px solid var(--ink); padding-bottom:14px;}
+.eyebrow{font-family:'Space Mono',monospace; font-size:11px; letter-spacing:3px; color:var(--muted); text-transform:uppercase;}
+.card{border:1.5px solid var(--ink); border-radius:4px; padding:20px; margin-bottom:16px; background:#fff;}
+.field-row{margin-bottom:12px;}
+.field-row label{display:block; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:4px;}
+input, select{width:100%; padding:10px; border:1.5px solid var(--ink); border-radius:3px; font-family:'Inter',sans-serif; font-size:14px;}
+.btn{border:2px solid var(--ink); background:var(--ink); color:#fff; border-radius:3px; padding:12px 16px; font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; cursor:pointer; font-size:14px;}
+.btn:hover{opacity:0.85;}
+.btn.outline{background:#fff; color:var(--ink);}
+.btn.danger{background:var(--stamp-red); border-color:var(--stamp-red);}
+.btn.small{padding:6px 10px; font-size:11px;}
+.error-text{color:var(--stamp-red); font-size:13px; margin-top:8px; min-height:16px;}
+.link-btn{background:none; border:none; color:var(--muted); text-decoration:underline; cursor:pointer; font-size:13px; padding:0;}
+table{width:100%; border-collapse:collapse; font-size:13px;}
+th, td{border-bottom:1px solid var(--line); padding:8px 6px; text-align:left;}
+th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--muted);}
+.tag{display:inline-block; padding:2px 8px; border-radius:20px; font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase;}
+.tag.ativo{background:#e4f2e7; color:var(--confirm-green);}
+.tag.demitido{background:#f6e4e4; color:var(--stamp-red);}
+.row-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.hidden{display:none !important;}
+.toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:4px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s;}
+.toast.show{opacity:1;}
+.modal-overlay{display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; align-items:center; justify-content:center; padding:16px;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff; border-radius:6px; padding:22px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto;}
+.month-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.month-nav button{border:1px solid var(--ink); background:#fff; border-radius:3px; padding:4px 12px; cursor:pointer;}
+.back-link{cursor:pointer; color:var(--muted); font-family:'Space Mono',monospace; font-size:12px; text-decoration:underline;}
+
+.header-row{display:flex; align-items:center; gap:14px; margin-bottom:22px; border-bottom:2px solid var(--ink); padding-bottom:16px;}
+.menu-btn{
+  border:1.5px solid var(--ink); background:#fff; border-radius:4px;
+  width:40px; height:40px; font-size:18px; cursor:pointer; flex-shrink:0;
+}
+.drawer-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.5);
+  display:none; z-index:90;
+}
+.drawer-overlay.show{display:block;}
+.drawer{
+  position:fixed; top:0; left:0; bottom:0; width:88%; max-width:320px;
+  background:#F2F2F2; border-right:2px solid var(--ink);
+  display:flex; flex-direction:column;
+  transform:translateX(-100%); transition:transform 0.2s ease;
+}
+.drawer-overlay.show .drawer{transform:translateX(0);}
+.drawer-header{
+  padding:18px 16px; border-bottom:2px solid var(--ink); background:#fff;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.drawer-header h2{margin:0; font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase;}
+.drawer-close{border:1.5px solid var(--ink); background:#fff; border-radius:4px; width:32px; height:32px; font-size:16px; cursor:pointer;}
+.drawer-body{flex:1; overflow-y:auto; padding:8px 0;}
+.drawer-account{padding:14px 16px; border-bottom:1px solid var(--line); background:#fff;}
+.drawer-account .acc-label{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--muted); letter-spacing:1px;}
+.drawer-account .acc-value{font-family:'Inter',sans-serif; font-size:14px; font-weight:600; word-break:break-all;}
+.drawer-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:12px 16px; border:none; background:none; text-align:left;
+  font-family:'Inter',sans-serif; font-size:14.5px; color:var(--ink);
+  cursor:pointer;
+}
+.drawer-item:active{background:#e2e2e2;}
+.drawer-item .ic{width:20px; text-align:center; flex-shrink:0;}
+.drawer-item.danger{color:var(--stamp-red);}
+.drawer-footer{border-top:2px solid var(--ink); padding:8px; background:#fff;}
+</style>
+</head>
+<body>
+<div class="drawer-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-header">
+      <h2>Menu</h2>
+      <button class="drawer-close" id="drawerCloseBtn" aria-label="Fechar menu">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-account">
+        <div class="acc-label">Conta ADM</div>
+        <div class="acc-value" id="drawerAccountEmail">—</div>
+      </div>
+      <button class="drawer-item" id="menuGoSolicitacoes"><span class="ic">⏳</span> Solicitações de ajuste</button>
+      <button class="drawer-item" id="menuGoCreate"><span class="ic">➕</span> Adicionar funcionário</button>
+      <button class="drawer-item" id="menuGoList"><span class="ic">👥</span> Funcionários</button>
+    </div>
+    <div class="drawer-footer">
+      <button class="drawer-item danger" id="menuLogoutBtn"><span class="ic">🚪</span> Sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="header-row">
+    <button class="menu-btn" id="menuBtn" aria-label="Abrir menu">☰</button>
+    <div>
+      <div class="eyebrow">Controle de Ponto</div>
+      <h1 style="margin:0; border:none; padding:0;">Painel administrativo</h1>
+    </div>
+  </div>
+
+  <!-- login -->
+  <div class="card" id="loginCard">
+    <p style="font-size:13px; color:var(--muted);">Acesso restrito ao ADM. Use a conta separada de administrador.</p>
+    <div class="field-row">
+      <label for="adminEmail">E-mail do ADM</label>
+      <input type="email" id="adminEmail" autocomplete="username">
+    </div>
+    <div class="field-row">
+      <label for="adminPassword">Senha</label>
+      <input type="password" id="adminPassword" autocomplete="current-password">
+    </div>
+    <button class="btn" id="loginBtn">Entrar</button>
+    <button class="link-btn" id="toggleCreateBtn" style="margin-top:10px; display:block;">Primeira vez? Criar a conta do ADM</button>
+    <div class="error-text" id="loginError"></div>
+  </div>
+
+  <!-- lista de funcionários -->
+  <div id="appArea" class="hidden">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong id="adminEmailLabel"></strong>
+          <div id="adminUidLabel" style="font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); margin-top:2px;"></div>
+        </div>
+        <button class="btn outline small" id="logoutBtnOld" style="display:none;">Sair</button>
+      </div>
+      <button class="link-btn" id="diagBtn" style="margin-top:10px;">🩺 Testar diagnóstico de permissão</button>
+      <div id="diagResult" style="font-family:'Space Mono',monospace; font-size:11.5px; white-space:pre-wrap; margin-top:8px;"></div>
+    </div>
+
+    <div class="card" id="solicitacoesCard" style="border-color:var(--stamp-red);">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase; margin:0;">Solicitações de ajuste</h2>
+        <span id="solicitacoesBadge" class="tag demitido" style="display:none;">0 pendente(s)</span>
+      </div>
+      <div id="solicitacoesList" style="margin-top:12px;">Carregando…</div>
+    </div>
+
+    <div class="card" id="createCard">
+      <h2 style="font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase;">Adicionar funcionário</h2>
+      <p style="font-size:13px; color:var(--muted);">Só você cria as contas. Escolha uma senha inicial e passe pra pessoa — ela pode trocar depois pelo próprio app.</p>
+      <div class="field-row">
+        <label for="newNome">Nome</label>
+        <input type="text" id="newNome" placeholder="Nome completo">
+      </div>
+      <div class="field-row">
+        <label for="newTipoId">Login por</label>
+        <select id="newTipoId">
+          <option value="email">E-mail</option>
+          <option value="cpf">CPF</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label for="newIdentifier" id="newIdentifierLabel">E-mail</label>
+        <input type="text" id="newIdentifier" placeholder="pessoa@email.com">
+      </div>
+      <div class="field-row">
+        <label for="newSenha">Senha inicial</label>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="newSenha" placeholder="mín. 6 caracteres">
+          <button class="btn outline small" id="gerarSenhaBtn" type="button">Gerar</button>
+        </div>
+      </div>
+      <button class="btn" id="criarFuncionarioBtn">Criar conta</button>
+      <div class="error-text" id="createError"></div>
+      <div id="createResult" style="display:none; margin-top:12px; padding:10px; border:1px dashed var(--ink); font-family:'Space Mono',monospace; font-size:12.5px;"></div>
+    </div>
+
+    <div class="card" id="listCard">
+      <h2 style="font-family:'Oswald',sans-serif; font-size:16px; text-transform:uppercase;">Funcionários</h2>
+      <div id="employeesTableWrap">Carregando…</div>
+      <details style="margin-top:14px;">
+        <summary style="font-size:12.5px; color:var(--muted); cursor:pointer;">Não vejo um funcionário que já existia antes</summary>
+        <p style="font-size:12.5px; color:var(--muted); margin:8px 0;">Abra o Firestore Database → Data → coleção "employees" no console do Firebase, copie o ID do documento da pessoa, e cole aqui:</p>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="recuperarUidInput" placeholder="UID do funcionário">
+          <button class="btn outline small" id="recuperarUidBtn">Adicionar</button>
+        </div>
+        <p class="error-text" id="recuperarUidMsg"></p>
+      </details>
+    </div>
+
+    <!-- detalhe de um funcionário -->
+    <div class="card hidden" id="detailCard">
+      <span class="back-link" id="backToListBtn">‹ voltar para a lista</span>
+      <h2 id="detailNome" style="font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase; margin-top:6px;"></h2>
+      <div id="detailStatusTag" style="margin-bottom:14px;"></div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="btn outline small" id="demitirBtn">Demitir</button>
+        <button class="btn outline small" id="readmitirBtn">Readmitir</button>
+        <button class="btn outline small" id="configPagamentoBtn">Configurar pagamento / diária</button>
+      </div>
+
+      <div class="month-nav">
+        <button id="prevMonthBtn">‹</button>
+        <div id="monthLabel" style="font-family:'Space Mono',monospace;">—</div>
+        <button id="nextMonthBtn">›</button>
+      </div>
+      <div id="monthTableWrap">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- modal: configurar pagamento -->
+<div class="modal-overlay" id="payConfigOverlay">
+  <div class="modal">
+    <h3>Configurar pagamento</h3>
+    <div class="field-row">
+      <label for="tipoPagamentoSelect">Tipo de pagamento</label>
+      <select id="tipoPagamentoSelect">
+        <option value="mensalista">Mensalista (CLT)</option>
+        <option value="diarista">Diarista</option>
+      </select>
+    </div>
+    <div id="diaristaFields">
+      <div class="field-row"><label for="valor4h">Valor da diária de 4 horas (R$)</label><input type="number" id="valor4h" step="0.01" min="0"></div>
+      <div class="field-row"><label for="valor6h">Valor da diária de 6 horas (R$)</label><input type="number" id="valor6h" step="0.01" min="0"></div>
+      <div class="field-row"><label for="valor8h">Valor da diária de 8 horas (R$)</label><input type="number" id="valor8h" step="0.01" min="0"></div>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="payConfigCancel">Cancelar</button>
+      <button class="btn" id="payConfigSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script>
+// Mesmo projeto Firebase do app de ponto — mesmo banco de dados.
+const firebaseConfig = {
+  apiKey: "AIzaSyA_hyosRTkvlk8_Qj-V9k0-2fiy1b9MYVM",
+  authDomain: "controle-ponto-7a04d.firebaseapp.com",
+  projectId: "controle-ponto-7a04d",
+  storageBucket: "controle-ponto-7a04d.firebasestorage.app",
+  messagingSenderId: "458473922894",
+  appId: "1:458473922894:web:f72ee3fa6f017af660fe1f",
+  measurementId: "G-F7VQSSTHNN"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/default/documents`;
+
+const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
+const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
+const RETENCAO_DIAS_APOS_DEMISSAO = 90; // três meses
+
+let employees = []; // lista carregada da coleção employees
+let currentDetailUid = null;
+let viewMonth = null;
+let createMode = false;
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function showToast(msg, ms=3500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), ms);
+}
+function on(id, ev, fn){ const el=document.getElementById(id); if(el) el.addEventListener(ev, fn); }
+
+async function authToken(){
+  return auth.currentUser ? await auth.currentUser.getIdToken() : null;
+}
+
+function firestoreFieldsToObj(fields){
+  if(!fields) return {};
+  const out = {};
+  for(const k in fields){
+    const v = fields[k];
+    if(v.stringValue !== undefined) out[k] = v.stringValue;
+    else if(v.integerValue !== undefined) out[k] = parseInt(v.integerValue,10);
+    else if(v.doubleValue !== undefined) out[k] = v.doubleValue;
+    else if(v.booleanValue !== undefined) out[k] = v.booleanValue;
+    else if(v.nullValue !== undefined) out[k] = null;
+    else if(v.mapValue !== undefined) out[k] = firestoreFieldsToObj(v.mapValue.fields||{});
+    else if(v.arrayValue !== undefined) out[k] = (v.arrayValue.values||[]).map(item=>{
+      if(item.stringValue !== undefined) return item.stringValue;
+      if(item.integerValue !== undefined) return parseInt(item.integerValue,10);
+      if(item.mapValue !== undefined) return firestoreFieldsToObj(item.mapValue.fields||{});
+      return null;
+    });
+    else out[k] = null;
+  }
+  return out;
+}
+function objToFirestoreFields(obj){
+  const fields = {};
+  for(const k in obj){
+    const v = obj[k];
+    if(v === null || v === undefined) fields[k] = { nullValue:null };
+    else if(Array.isArray(v)) fields[k] = { arrayValue:{ values: v.map(item=>{
+      if(typeof item === 'number') return Number.isInteger(item) ? {integerValue:String(item)} : {doubleValue:item};
+      if(typeof item === 'object') return { mapValue:{ fields: objToFirestoreFields(item) } };
+      return { stringValue:String(item) };
+    }) } };
+    else if(typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue:String(v) } : { doubleValue:v };
+    else if(typeof v === 'boolean') fields[k] = { booleanValue:v };
+    else if(typeof v === 'object') fields[k] = { mapValue:{ fields: objToFirestoreFields(v) } };
+    else fields[k] = { stringValue:String(v) };
+  }
+  return fields;
+}
+
+// --- índice de funcionários: como a coleção "employees" às vezes nega
+// list() (é um comportamento chato do Firestore com listas grandes/regras
+// baseadas em exists()), o painel para de "listar a coleção" e passa a
+// ler um documento único com a lista de UIDs — isso usa "get", que já
+// confirmamos que funciona certinho.
+async function getEmployeeIndex(){
+  const idx = await getIndex('employees');
+  return idx ? { uids: idx.ids } : null;
+}
+async function addUidToIndex(novoUid){
+  const idx = await getEmployeeIndex();
+  if(!idx) return false;
+  if(idx.uids.includes(novoUid)) return true;
+  const token = await authToken();
+  const novaLista = [...idx.uids, novoUid];
+  const res = await fetch(`${FIRESTORE_REST_BASE}/admin_index/employees`, {
+    method:'PATCH',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields: objToFirestoreFields({ ids: novaLista }) })
+  });
+  return res.ok;
+}
+
+function isValidCPF(cpf){
+  const s = cpf.replace(/\D/g,'');
+  if(s.length !== 11 || /^(\d)\1{10}$/.test(s)) return false;
+  let soma = 0;
+  for(let i=0;i<9;i++) soma += parseInt(s[i]) * (10-i);
+  let resto = (soma*10) % 11;
+  if(resto===10) resto=0;
+  if(resto !== parseInt(s[9])) return false;
+  soma = 0;
+  for(let i=0;i<10;i++) soma += parseInt(s[i]) * (11-i);
+  resto = (soma*10) % 11;
+  if(resto===10) resto=0;
+  return resto === parseInt(s[10]);
+}
+function identifierToAuthEmail(tipo, valor){
+  if(tipo === 'cpf'){
+    const digits = valor.replace(/\D/g,'');
+    return `cpf${digits}@pontoapp.local`;
+  }
+  return valor.trim();
+}
+function gerarSenhaAleatoria(){
+  const alfabeto = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const arr = new Uint32Array(8);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, n=>alfabeto[n % alfabeto.length]).join('');
+}
+function toggleNewIdType(){
+  const tipo = document.getElementById('newTipoId').value;
+  const input = document.getElementById('newIdentifier');
+  const label = document.getElementById('newIdentifierLabel');
+  if(tipo === 'cpf'){
+    label.textContent = 'CPF'; input.placeholder = 'Somente números';
+  }else{
+    label.textContent = 'E-mail'; input.placeholder = 'pessoa@email.com';
+  }
+}
+// Cria a conta de login (Firebase Auth) num app secundário, pra não
+// derrubar a sessão do ADM, e depois grava o cadastro em employees/{uid}.
+async function criarFuncionario(){
+  const errEl = document.getElementById('createError');
+  const resultEl = document.getElementById('createResult');
+  errEl.textContent = ''; resultEl.style.display = 'none';
+  const nome = document.getElementById('newNome').value.trim();
+  const tipo = document.getElementById('newTipoId').value;
+  const idRaw = document.getElementById('newIdentifier').value.trim();
+  const senha = document.getElementById('newSenha').value;
+  if(!nome){ errEl.textContent = 'Informe o nome.'; return; }
+  if(!idRaw){ errEl.textContent = 'Informe o e-mail ou CPF.'; return; }
+  if(tipo === 'cpf' && !isValidCPF(idRaw)){ errEl.textContent = 'CPF inválido.'; return; }
+  if(!senha || senha.length < 6){ errEl.textContent = 'A senha deve ter pelo menos 6 caracteres.'; return; }
+  const authEmail = identifierToAuthEmail(tipo, idRaw);
+
+  const btn = document.getElementById('criarFuncionarioBtn');
+  btn.disabled = true; btn.textContent = 'Criando...';
+  let secApp;
+  try{
+    secApp = firebase.apps.find(a=>a.name==='Secondary') || firebase.initializeApp(firebaseConfig, 'Secondary');
+    const secAuth = secApp.auth();
+    let novoUid;
+    try{
+      const cred = await secAuth.createUserWithEmailAndPassword(authEmail, senha);
+      novoUid = cred.user.uid;
+    }finally{
+      try{ await secAuth.signOut(); }catch(e){}
+    }
+    const fields = {
+      nome, identifier: authEmail, status:'ativo', demitidoEm:null,
+      tipoPagamento:'mensalista', diariaValores:{'4':0,'6':0,'8':0},
+      createdAt: new Date().toISOString()
+    };
+    const token = await authToken();
+    const res = await fetch(`${FIRESTORE_REST_BASE}/employees/${novoUid}`, {
+      method:'PATCH',
+      headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields: objToFirestoreFields(fields) })
+    });
+    if(!res.ok){ errEl.textContent = 'Conta de login criada, mas houve erro ao salvar o cadastro. Recarregue e tente configurar depois.'; return; }
+    await addUidToIndex(novoUid);
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `Conta criada! Repasse pra pessoa:<br><b>Login:</b> ${tipo==='cpf'?idRaw:authEmail}<br><b>Senha:</b> ${senha}<br><span style="color:var(--muted); font-family:'Inter',sans-serif; font-size:11.5px;">Ela pode trocar a senha depois, dentro do app.</span>`;
+    document.getElementById('newNome').value = '';
+    document.getElementById('newIdentifier').value = '';
+    document.getElementById('newSenha').value = '';
+    showToast('Funcionário criado.');
+    await loadEmployees();
+  }catch(e){
+    if(e.code === 'auth/email-already-in-use'){
+      errEl.textContent = tipo==='cpf' ? 'Esse CPF já tem conta.' : 'Esse e-mail já tem conta.';
+    }else if(e.code === 'auth/invalid-email'){
+      errEl.textContent = 'E-mail inválido.';
+    }else if(e.code === 'auth/weak-password'){
+      errEl.textContent = 'Senha muito fraca.';
+    }else{
+      errEl.textContent = 'Erro ao criar conta (' + (e.code || e.message) + ').';
+    }
+  }finally{
+    btn.disabled = false; btn.textContent = 'Criar conta';
+  }
+}
+
+// --- lista de funcionários (exige ser ADM pelas regras do Firestore) ---
+// --- solicitações de ajuste/exclusão de ponto ---
+const LABELS_CAMPO = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída', falta:'Falta'};
+let solicitacoesPendentesAntes = 0;
+
+async function getIndex(indexDocId){
+  const token = await authToken();
+  const res = await fetch(`${FIRESTORE_REST_BASE}/admin_index/${indexDocId}`, { headers:{ Authorization:`Bearer ${token}` } });
+  if(res.status === 404) return { ids: [] };
+  if(!res.ok) return null;
+  const data = await res.json();
+  return { ids: firestoreFieldsToObj(data.fields).ids || [] };
+}
+async function loadSolicitacoes(){
+  const listEl = document.getElementById('solicitacoesList');
+  const badge = document.getElementById('solicitacoesBadge');
+  const idx = await getIndex('solicitacoes');
+  if(!idx){
+    listEl.innerHTML = `<p class="error-text">Erro ao carregar o índice de solicitações.</p>`;
+    badge.style.display='none';
+    return;
+  }
+  const token = await authToken();
+  const resultados = await Promise.all(idx.ids.map(async (id)=>{
+    try{
+      const res = await fetch(`${FIRESTORE_REST_BASE}/solicitacoes/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
+      if(!res.ok) return null;
+      const doc = await res.json();
+      return { id, ...firestoreFieldsToObj(doc.fields) };
+    }catch(e){ return null; }
+  }));
+  const todas = resultados.filter(Boolean);
+  const pendentes = todas.filter(s=>s.status==='pendente').sort((a,b)=> (a.criadoEm||'') < (b.criadoEm||'') ? 1 : -1);
+
+  // "notificação": título da aba + notificação do navegador (só funciona
+  // com a aba aberta — sem um servidor por trás não dá pra avisar com o
+  // site fechado).
+  document.title = pendentes.length>0 ? `(${pendentes.length}) Painel ADM` : 'Painel ADM';
+  if(pendentes.length > solicitacoesPendentesAntes && solicitacoesPendentesAntes !== 0){
+    if(window.Notification && Notification.permission === 'granted'){
+      new Notification('Nova solicitação de ajuste de ponto', { body:`${pendentes.length} pendente(s) aguardando aprovação.` });
+    }
+  }
+  solicitacoesPendentesAntes = pendentes.length;
+
+  if(pendentes.length===0){
+    badge.style.display = 'none';
+    listEl.innerHTML = '<p style="font-size:13px; color:var(--muted);">Nenhuma solicitação pendente.</p>';
+    return;
+  }
+  badge.style.display = 'inline-block';
+  badge.textContent = `${pendentes.length} pendente(s)`;
+  listEl.innerHTML = pendentes.map(s=>{
+    const antigo = s.antigo || {};
+    const novo = s.novo || {};
+    let diffHtml;
+    if(s.tipo === 'exclusao'){
+      diffHtml = `<span style="color:var(--stamp-red);">Excluir o dia inteiro</span> (valores atuais: ${Object.keys(LABELS_CAMPO).filter(k=>k!=='falta').map(k=>antigo[k]?`${LABELS_CAMPO[k]} ${antigo[k]}`:null).filter(Boolean).join(', ') || (antigo.falta?'Falta':'sem registros')})`;
+    }else{
+      const campos = Object.keys(LABELS_CAMPO);
+      const linhas = campos.filter(k=> (antigo[k]||null) !== (novo[k]||null) ).map(k=>{
+        const de = k==='falta' ? (antigo.falta?'Falta':'—') : (antigo[k]||'—');
+        const para = k==='falta' ? (novo.falta?'Falta':'—') : (novo[k]||'—');
+        return `${LABELS_CAMPO[k]}: <b>${de}</b> → <b>${para}</b>`;
+      });
+      diffHtml = linhas.length ? linhas.join('<br>') : 'Sem diferenças nos horários.';
+    }
+    return `<div style="border-bottom:1px solid var(--line); padding:10px 0;">
+      <div><strong>${s.nomeFuncionario||'—'}</strong> · ${(s.dateKey||'').split('-').reverse().join('/')} · ${s.tipo==='exclusao'?'Exclusão':'Edição'}</div>
+      <div style="font-size:13px; margin:6px 0;">${diffHtml}</div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Justificativa: "${(s.justificativa||'').replace(/</g,'&lt;')}"</div>
+      <div class="row-actions">
+        <button class="btn small outline" data-approve="${s.id}" data-uid="${s.uid}">Aprovar</button>
+        <button class="btn small danger" data-reject="${s.id}" data-uid="${s.uid}">Rejeitar</button>
+      </div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('button[data-approve]').forEach(btn=>{
+    btn.addEventListener('click', ()=>resolverSolicitacao(btn.getAttribute('data-approve'), btn.getAttribute('data-uid'), true));
+  });
+  listEl.querySelectorAll('button[data-reject]').forEach(btn=>{
+    btn.addEventListener('click', ()=>resolverSolicitacao(btn.getAttribute('data-reject'), btn.getAttribute('data-uid'), false));
+  });
+}
+
+async function resolverSolicitacao(id, uid, aprovar){
+  const token = await authToken();
+  // pega a solicitação específica pra saber data/tipo/novo valor
+  const res = await fetch(`${FIRESTORE_REST_BASE}/solicitacoes/${id}`, { headers:{ Authorization:`Bearer ${token}` } });
+  if(!res.ok){ showToast('Erro ao carregar a solicitação.'); return; }
+  const doc = await res.json();
+  const s = firestoreFieldsToObj(doc.fields);
+
+  // aplica (ou não) no ponto-records do funcionário
+  const records = await fetchRecords(uid);
+  const rec = records[s.dateKey];
+  if(aprovar){
+    if(s.tipo === 'exclusao'){
+      delete records[s.dateKey];
+    }else{
+      records[s.dateKey] = s.novo;
+    }
+  }else if(rec && rec.pendingRequest){
+    delete rec.pendingRequest;
+    const semDados = !rec.entrada && !rec.almocoSaida && !rec.almocoVolta && !rec.saida && !rec.falta;
+    if(semDados) delete records[s.dateKey]; else records[s.dateKey] = rec;
+  }
+  await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, {
+    method:'PATCH',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields:{ value:{ stringValue: JSON.stringify(records) }, updatedAt:{ timestampValue:new Date().toISOString() } } })
+  });
+
+  // marca a solicitação como resolvida
+  await fetch(`${FIRESTORE_REST_BASE}/solicitacoes/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=respondidoEm`, {
+    method:'PATCH',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields: objToFirestoreFields({ status: aprovar?'aprovado':'rejeitado', respondidoEm:new Date().toISOString() }) })
+  });
+
+  showToast(aprovar ? 'Solicitação aprovada.' : 'Solicitação rejeitada.');
+  await loadSolicitacoes();
+  if(currentDetailUid === uid) await renderMonth();
+}
+
+async function loadEmployees(){
+  const idx = await getEmployeeIndex();
+  const wrap = document.getElementById('employeesTableWrap');
+  if(!idx){
+    const uid = auth.currentUser ? auth.currentUser.uid : '—';
+    wrap.innerHTML = `<p class="error-text">Erro ao carregar o índice de funcionários.<br>UID desta conta: <b>${uid}</b><br>Confira se existe o documento <b>admins/${uid}</b> no Firestore.</p>`;
+    return;
+  }
+  const token = await authToken();
+  const resultados = await Promise.all(idx.uids.map(async (uid)=>{
+    try{
+      const res = await fetch(`${FIRESTORE_REST_BASE}/employees/${uid}`, { headers:{ Authorization:`Bearer ${token}` } });
+      if(!res.ok) return null;
+      const doc = await res.json();
+      return { uid, ...firestoreFieldsToObj(doc.fields) };
+    }catch(e){ return null; }
+  }));
+  employees = resultados.filter(Boolean);
+  await cleanupDemitidosAntigos();
+  renderEmployeesTable();
+}
+// Pra funcionários criados ANTES desse índice existir: cola o UID (dá pra
+// ver em Firestore Database → Data → coleção "employees", no console) e
+// isso confere se o cadastro existe e adiciona no índice.
+async function recuperarUidExistente(){
+  const uid = document.getElementById('recuperarUidInput').value.trim();
+  const msgEl = document.getElementById('recuperarUidMsg');
+  if(!uid){ msgEl.textContent = 'Cole o UID do funcionário.'; return; }
+  const token = await authToken();
+  const res = await fetch(`${FIRESTORE_REST_BASE}/employees/${uid}`, { headers:{ Authorization:`Bearer ${token}` } });
+  if(!res.ok){ msgEl.textContent = 'Não encontrei um cadastro com esse UID.'; return; }
+  const ok = await addUidToIndex(uid);
+  if(!ok){ msgEl.textContent = 'Encontrei o cadastro, mas não consegui salvar no índice.'; return; }
+  msgEl.textContent = 'Adicionado! Atualizando a lista...';
+  document.getElementById('recuperarUidInput').value = '';
+  await loadEmployees();
+  msgEl.textContent = '';
+}
+function renderEmployeesTable(){
+  const wrap = document.getElementById('employeesTableWrap');
+  if(employees.length === 0){ wrap.innerHTML = '<p>Nenhum funcionário cadastrado ainda.</p>'; return; }
+  wrap.innerHTML = `<table><thead><tr><th>Nome</th><th>Identificação</th><th>Status</th><th>Pagamento</th><th></th></tr></thead><tbody>
+    ${employees.map(e=>`<tr>
+      <td>${e.nome||'—'}</td>
+      <td>${e.identifier||'—'}</td>
+      <td><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span></td>
+      <td>${e.tipoPagamento==='diarista'?'Diarista':'Mensalista'}</td>
+      <td><button class="btn small outline" data-uid="${e.uid}">Ver</button></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+  wrap.querySelectorAll('button[data-uid]').forEach(btn=>{
+    btn.addEventListener('click', ()=>openDetail(btn.getAttribute('data-uid')));
+  });
+}
+
+// --- limpeza automática: 3 meses após demitir, apaga o histórico de ponto ---
+async function cleanupDemitidosAntigos(){
+  const agora = Date.now();
+  const token = await authToken();
+  for(const e of employees){
+    if(e.status !== 'demitido' || !e.demitidoEm) continue;
+    const demitidoEm = new Date(e.demitidoEm).getTime();
+    const dias = (agora - demitidoEm) / (1000*60*60*24);
+    if(dias >= RETENCAO_DIAS_APOS_DEMISSAO){
+      try{
+        await fetch(`${FIRESTORE_REST_BASE}/users/${e.uid}/appdata/ponto-records`, {
+          method:'DELETE', headers:{ Authorization:`Bearer ${token}` }
+        });
+      }catch(err){ /* tenta de novo na próxima abertura do painel */ }
+    }
+  }
+}
+
+// --- detalhe do funcionário ---
+async function openDetail(uid){
+  currentDetailUid = uid;
+  const e = employees.find(x=>x.uid===uid);
+  document.getElementById('listCard').classList.add('hidden');
+  document.getElementById('detailCard').classList.remove('hidden');
+  document.getElementById('detailNome').textContent = e.nome || '—';
+  document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span> · ${e.tipoPagamento==='diarista'?'Diarista':'Mensalista'}`;
+  viewMonth = new Date().toISOString().slice(0,7);
+  await renderMonth();
+}
+function backToList(){
+  document.getElementById('detailCard').classList.add('hidden');
+  document.getElementById('listCard').classList.remove('hidden');
+}
+function shiftMonth(mk, delta){
+  let [y,m] = mk.split('-').map(Number);
+  m += delta; if(m<1){m=12;y-=1;} else if(m>12){m=1;y+=1;}
+  return `${y}-${pad(m)}`;
+}
+function monthLabelOf(mk){
+  const [y,m] = mk.split('-');
+  const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  return `${meses[+m-1]} de ${y}`;
+}
+function timeToMinutes(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function formatMinutes(mins){ const h=Math.floor(mins/60); const mm=mins%60; return `${h}h${pad(mm)}`; }
+
+async function fetchRecords(uid){
+  const token = await authToken();
+  const res = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, { headers:{ Authorization:`Bearer ${token}` } });
+  if(res.status === 404) return {};
+  if(!res.ok) return {};
+  const data = await res.json();
+  const raw = data.fields && data.fields.value && data.fields.value.stringValue;
+  try{ return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; }
+}
+async function renderMonth(){
+  document.getElementById('monthLabel').textContent = monthLabelOf(viewMonth);
+  const wrap = document.getElementById('monthTableWrap');
+  wrap.innerHTML = 'Carregando…';
+  const records = await fetchRecords(currentDetailUid);
+  const dias = Object.keys(records).filter(k=>k.startsWith(viewMonth)).sort();
+  if(dias.length===0){ wrap.innerHTML = '<p>Sem batidas neste mês.</p>'; return; }
+  let totalMins = 0;
+  const linhas = dias.map(dateKey=>{
+    const rec = records[dateKey];
+    let mins = 0, texto='';
+    if(rec.falta){ texto = 'Falta'; }
+    else if(rec.diarista){
+      const e=timeToMinutes(rec.entrada), s=timeToMinutes(rec.saida);
+      if(e!==null && s!==null){ mins = Math.max(0,s-e); texto = formatMinutes(mins); }
+    }else{
+      const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
+      if(e!==null&&as!==null) mins += (as-e);
+      if(av!==null&&s!==null) mins += (s-av);
+      texto = mins>0 ? formatMinutes(mins) : '(parcial)';
+    }
+    totalMins += mins;
+    const locLinks = TIPOS.filter(t=>rec[t+'Loc']).map(t=>{
+      const l = rec[t+'Loc'];
+      return `<a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">${LABELS[t]}📍</a>`;
+    }).join(' ');
+    return `<tr>
+      <td>${dateKey.split('-').reverse().join('/')}${rec.pendingRequest?' ⏳':''}</td>
+      <td>${rec.entrada||'—'}</td>
+      <td>${rec.almocoSaida||(rec.diarista?'—(diarista)':'—')}</td>
+      <td>${rec.almocoVolta||(rec.diarista?'—(diarista)':'—')}</td>
+      <td>${rec.saida||'—'}</td>
+      <td>${texto}</td>
+      <td>${locLinks||'—'}</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<p><strong>Total do mês:</strong> ${formatMinutes(totalMins)}</p>
+    <div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Entrada</th><th>S.Almoço</th><th>V.Almoço</th><th>Saída</th><th>Total</th><th>Local</th></tr></thead>
+    <tbody>${linhas}</tbody></table></div>`;
+}
+
+// --- demitir / readmitir ---
+async function setEmployeeFields(uid, fieldsObj){
+  const token = await authToken();
+  const keys = Object.keys(fieldsObj);
+  const mask = keys.map(k=>`updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  const res = await fetch(`${FIRESTORE_REST_BASE}/employees/${uid}?${mask}`, {
+    method:'PATCH',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields: objToFirestoreFields(fieldsObj) })
+  });
+  return res.ok;
+}
+async function demitir(){
+  if(!confirm('Demitir esta pessoa? Ela perde o acesso pra bater ponto imediatamente. O histórico de batidas fica guardado por mais 3 meses e depois é apagado automaticamente.')) return;
+  const ok = await setEmployeeFields(currentDetailUid, { status:'demitido', demitidoEm: new Date().toISOString() });
+  if(ok){ showToast('Funcionário demitido.'); await loadEmployees(); openDetail(currentDetailUid); }
+  else showToast('Não foi possível salvar.');
+}
+async function readmitir(){
+  const ok = await setEmployeeFields(currentDetailUid, { status:'ativo', demitidoEm:null });
+  if(ok){ showToast('Funcionário readmitido.'); await loadEmployees(); openDetail(currentDetailUid); }
+  else showToast('Não foi possível salvar.');
+}
+
+// --- configurar pagamento / diária ---
+function openPayConfig(){
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  document.getElementById('tipoPagamentoSelect').value = e.tipoPagamento || 'mensalista';
+  const dv = e.diariaValores || {};
+  document.getElementById('valor4h').value = dv['4']||dv[4]||0;
+  document.getElementById('valor6h').value = dv['6']||dv[6]||0;
+  document.getElementById('valor8h').value = dv['8']||dv[8]||0;
+  toggleDiaristaFields();
+  document.getElementById('payConfigOverlay').classList.add('show');
+}
+function toggleDiaristaFields(){
+  const sel = document.getElementById('tipoPagamentoSelect').value;
+  document.getElementById('diaristaFields').style.display = sel==='diarista' ? 'block' : 'none';
+}
+async function savePayConfig(){
+  const tipo = document.getElementById('tipoPagamentoSelect').value;
+  const fields = { tipoPagamento: tipo };
+  if(tipo === 'diarista'){
+    fields.diariaValores = {
+      '4': Number(document.getElementById('valor4h').value)||0,
+      '6': Number(document.getElementById('valor6h').value)||0,
+      '8': Number(document.getElementById('valor8h').value)||0
+    };
+  }
+  const ok = await setEmployeeFields(currentDetailUid, fields);
+  if(ok){
+    showToast('Configuração salva.');
+    document.getElementById('payConfigOverlay').classList.remove('show');
+    await loadEmployees(); openDetail(currentDetailUid);
+  }else showToast('Não foi possível salvar.');
+}
+
+// --- login do ADM (conta separada, só e-mail/senha) ---
+function setCreateMode(v){
+  createMode = v;
+  document.getElementById('toggleCreateBtn').textContent = v ? 'Já tenho conta, entrar' : 'Primeira vez? Criar a conta do ADM';
+  document.getElementById('loginBtn').textContent = v ? 'Criar conta' : 'Entrar';
+}
+async function onLogin(){
+  const email = document.getElementById('adminEmail').value.trim();
+  const senha = document.getElementById('adminPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!email || !senha){ errEl.textContent = 'Preencha e-mail e senha.'; return; }
+  try{
+    if(createMode){
+      await auth.createUserWithEmailAndPassword(email, senha);
+    }else{
+      await auth.signInWithEmailAndPassword(email, senha);
+    }
+  }catch(e){
+    errEl.textContent = e.message || 'Erro ao entrar.';
+  }
+}
+function onLogout(){ auth.signOut(); }
+
+async function runDiagnostico(){
+  const out = document.getElementById('diagResult');
+  out.textContent = 'Testando...';
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  const token = await authToken();
+  const linhas = [];
+  linhas.push('UID desta conta: ' + uid);
+  linhas.push('Projeto: ' + firebaseConfig.projectId);
+  linhas.push('');
+
+  // 1) Ler o PRÓPRIO documento em admins/{uid} — não depende de isAdmin(),
+  // só confirma se a conta em si consegue falar com o Firestore.
+  try{
+    const r1 = await fetch(`${FIRESTORE_REST_BASE}/admins/${uid}`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t1 = await r1.text();
+    linhas.push(`1) GET /admins/${uid} -> HTTP ${r1.status}`);
+    linhas.push(t1.slice(0, 300));
+  }catch(e){
+    linhas.push('1) erro de rede: ' + e.message);
+  }
+  linhas.push('');
+
+  // 2) Listar a coleção employees (é o pedido que estava falhando).
+  try{
+    const r2 = await fetch(`${FIRESTORE_REST_BASE}/employees`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t2 = await r2.text();
+    linhas.push(`2) GET /employees (lista) -> HTTP ${r2.status}`);
+    linhas.push(t2.slice(0, 300));
+  }catch(e){
+    linhas.push('2) erro de rede: ' + e.message);
+  }
+
+  linhas.push('');
+
+  // 3) Ler UM funcionário específico direto pelo UID dele (não a lista
+  // inteira) — isola se o problema é só no "listar" ou em tudo.
+  try{
+    const r3 = await fetch(`${FIRESTORE_REST_BASE}/employees/AkHK7r6dTxPNAZiScTWt9Jd647H3`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t3 = await r3.text();
+    linhas.push(`3) GET /employees/AkHK7r6dTxPNAZiScTWt9Jd647H3 (doc único) -> HTTP ${r3.status}`);
+    linhas.push(t3.slice(0, 300));
+  }catch(e){
+    linhas.push('3) erro de rede: ' + e.message);
+  }
+
+  out.textContent = linhas.join('\n');
+}
+on('diagBtn','click', runDiagnostico);
+
+let solicitacoesPollTimer = null;
+auth.onAuthStateChanged(async (user)=>{
+  if(user){
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('appArea').classList.remove('hidden');
+    document.getElementById('adminEmailLabel').textContent = user.email;
+    document.getElementById('adminUidLabel').textContent = 'UID: ' + user.uid;
+    document.getElementById('employeesTableWrap').innerHTML = 'Carregando…';
+    if(window.Notification && Notification.permission === 'default'){
+      Notification.requestPermission();
+    }
+    await loadEmployees();
+    await loadSolicitacoes();
+    if(solicitacoesPollTimer) clearInterval(solicitacoesPollTimer);
+    // Enquanto a aba do painel estiver aberta, confere a cada 30s se
+    // chegou solicitação nova. Sem um servidor por trás, não dá pra
+    // avisar com o site fechado — isso aqui é o mais próximo possível
+    // de uma notificação num site estático.
+    solicitacoesPollTimer = setInterval(loadSolicitacoes, 30000);
+  }else{
+    document.getElementById('appArea').classList.add('hidden');
+    document.getElementById('loginCard').classList.remove('hidden');
+    if(solicitacoesPollTimer){ clearInterval(solicitacoesPollTimer); solicitacoesPollTimer = null; }
+    document.title = 'Painel ADM';
+  }
+});
+
+on('loginBtn','click', onLogin);
+on('toggleCreateBtn','click', ()=>setCreateMode(!createMode));
+on('menuBtn','click', ()=>{
+  document.getElementById('drawerAccountEmail').textContent = auth.currentUser ? auth.currentUser.email : '—';
+  document.getElementById('drawerOverlay').classList.add('show');
+});
+on('drawerCloseBtn','click', ()=>document.getElementById('drawerOverlay').classList.remove('show'));
+on('drawerOverlay','click', (e)=>{ if(e.target.id==='drawerOverlay') document.getElementById('drawerOverlay').classList.remove('show'); });
+on('menuLogoutBtn','click', ()=>{ document.getElementById('drawerOverlay').classList.remove('show'); onLogout(); });
+function scrollToCard(id){
+  document.getElementById('drawerOverlay').classList.remove('show');
+  const el = document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+on('menuGoSolicitacoes','click', ()=>scrollToCard('solicitacoesCard'));
+on('menuGoCreate','click', ()=>scrollToCard('createCard'));
+on('menuGoList','click', ()=>scrollToCard('listCard'));
+on('newTipoId','change', toggleNewIdType);
+on('gerarSenhaBtn','click', ()=>{ document.getElementById('newSenha').value = gerarSenhaAleatoria(); });
+on('criarFuncionarioBtn','click', criarFuncionario);
+on('recuperarUidBtn','click', recuperarUidExistente);
+on('backToListBtn','click', backToList);
+on('demitirBtn','click', demitir);
+on('readmitirBtn','click', readmitir);
+on('configPagamentoBtn','click', openPayConfig);
+on('payConfigCancel','click', ()=>document.getElementById('payConfigOverlay').classList.remove('show'));
+on('payConfigSave','click', savePayConfig);
+on('tipoPagamentoSelect','change', toggleDiaristaFields);
+on('prevMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,-1); renderMonth(); });
+on('nextMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,1); renderMonth(); });
+</script>
+</body>
+</html>
