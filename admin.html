@@ -139,6 +139,8 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
         </div>
         <button class="btn outline small" id="logoutBtnOld" style="display:none;">Sair</button>
       </div>
+      <button class="link-btn" id="diagBtn" style="margin-top:10px;">🩺 Testar diagnóstico de permissão</button>
+      <div id="diagResult" style="font-family:'Space Mono',monospace; font-size:11.5px; white-space:pre-wrap; margin-top:8px;"></div>
     </div>
 
     <div class="card" id="solicitacoesCard" style="border-color:var(--stamp-red);">
@@ -728,6 +730,42 @@ async function onLogin(){
   }
 }
 function onLogout(){ auth.signOut(); }
+
+async function runDiagnostico(){
+  const out = document.getElementById('diagResult');
+  out.textContent = 'Testando...';
+  const uid = auth.currentUser ? auth.currentUser.uid : null;
+  const token = await authToken();
+  const linhas = [];
+  linhas.push('UID desta conta: ' + uid);
+  linhas.push('Projeto: ' + firebaseConfig.projectId);
+  linhas.push('');
+
+  // 1) Ler o PRÓPRIO documento em admins/{uid} — não depende de isAdmin(),
+  // só confirma se a conta em si consegue falar com o Firestore.
+  try{
+    const r1 = await fetch(`${FIRESTORE_REST_BASE}/admins/${uid}`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t1 = await r1.text();
+    linhas.push(`1) GET /admins/${uid} -> HTTP ${r1.status}`);
+    linhas.push(t1.slice(0, 300));
+  }catch(e){
+    linhas.push('1) erro de rede: ' + e.message);
+  }
+  linhas.push('');
+
+  // 2) Listar a coleção employees (é o pedido que estava falhando).
+  try{
+    const r2 = await fetch(`${FIRESTORE_REST_BASE}/employees`, { headers:{ Authorization:`Bearer ${token}` } });
+    const t2 = await r2.text();
+    linhas.push(`2) GET /employees (lista) -> HTTP ${r2.status}`);
+    linhas.push(t2.slice(0, 300));
+  }catch(e){
+    linhas.push('2) erro de rede: ' + e.message);
+  }
+
+  out.textContent = linhas.join('\n');
+}
+on('diagBtn','click', runDiagnostico);
 
 let solicitacoesPollTimer = null;
 auth.onAuthStateChanged(async (user)=>{
