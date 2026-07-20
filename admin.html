@@ -567,7 +567,7 @@ async function resolverSolicitacao(id, uid, aprovar){
     if(s.tipo === 'exclusao'){
       delete records[s.dateKey];
     }else{
-      records[s.dateKey] = s.novo;
+      records[s.dateKey] = { ...s.novo, avisoAprovado:{ quando: new Date().toISOString() } };
     }
   }else if(rec && rec.pendingRequest){
     delete rec.pendingRequest;
