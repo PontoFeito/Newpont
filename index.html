@@ -1284,7 +1284,7 @@ async function addIdToIndex(indexDocId, novoId){
 // batido continua o mesmo até a aprovação.
 async function createSolicitacao(fields){
   const uid = currentUid();
-  if(!uid) return false;
+  if(!uid) return null;
   try{
     const token = await auth.currentUser.getIdToken();
     const res = await fetch(`${FIRESTORE_REST_BASE}/solicitacoes`, {
@@ -1292,12 +1292,12 @@ async function createSolicitacao(fields){
       headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
       body: JSON.stringify({ fields: objToFirestoreFields({ ...fields, uid, status:'pendente', criadoEm:new Date().toISOString() }) })
     });
-    if(!res.ok) return false;
+    if(!res.ok) return null;
     const created = await res.json();
     const novoId = created.name.split('/').pop();
     await addIdToIndex('solicitacoes', novoId);
-    return true;
-  }catch(e){ return false; }
+    return novoId;
+  }catch(e){ return null; }
 }
 
 // Só LÊ o employees/{uid} — quem cria é sempre o ADM, pelo painel dele.
@@ -1324,6 +1324,16 @@ function temCadastroLiberado(){
 }
 function isDiarista(){
   return !!(employee && employee.tipoPagamento === 'diarista');
+}
+const PRAZO_REENVIO_MS = 24*60*60*1000; // 24 horas
+// Se o ADM demorar mais de 24h pra responder um pedido de ajuste/exclusão,
+// libera mandar um novo pedido pro mesmo dia em vez de ficar travado
+// esperando pra sempre.
+function pendingRequestExpirado(rec){
+  if(!rec || !rec.pendingRequest || !rec.pendingRequest.criadoEm) return false;
+  const criadoEm = new Date(rec.pendingRequest.criadoEm).getTime();
+  if(isNaN(criadoEm)) return false;
+  return (Date.now() - criadoEm) > PRAZO_REENVIO_MS;
 }
 
 // Cache local: guarda uma cópia de cada dado no próprio aparelho, pra
@@ -1870,9 +1880,12 @@ function proceedPendingAction(){
 
 let deleteJustDate = null;
 function openDeleteJustModal(key){
-  if(records[key] && records[key].pendingRequest){
+  if(records[key] && records[key].pendingRequest && !pendingRequestExpirado(records[key])){
     showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
     return;
+  }
+  if(records[key] && records[key].pendingRequest && pendingRequestExpirado(records[key])){
+    showToast('O pedido anterior desse dia passou de 24h sem resposta — enviando um novo pedido.', 5000);
   }
   deleteJustDate = key;
   document.getElementById('deleteJustDateLabel').textContent = `Excluir todos os registros de ${displayDateShort(key)}. Isso também precisa ser aprovado pelo administrador.`;
@@ -1891,13 +1904,17 @@ async function sendDeleteRequest(){
   records[key] = { ...antigo, pendingRequest:{ tipo:'exclusao', novo:null, justificativa, criadoEm:new Date().toISOString() } };
   const saved = await saveRecords();
   if(!saved){ if(backup){records[key]=backup;}else{delete records[key];} showToast('Não foi possível enviar a solicitação.'); return; }
-  await createSolicitacao({
+  const novoId = await createSolicitacao({
     nomeFuncionario: profile ? profile.nome : '',
     dateKey: key, tipo:'exclusao',
     antigo: {entrada:antigo.entrada||null, almocoSaida:antigo.almocoSaida||null, almocoVolta:antigo.almocoVolta||null, saida:antigo.saida||null, falta:!!antigo.falta},
     novo: null,
     justificativa
   });
+  if(novoId && records[key] && records[key].pendingRequest){
+    records[key].pendingRequest.solicitacaoId = novoId;
+    await saveRecords();
+  }
   closeDeleteJustModal();
   renderToday();
   renderHistory();
@@ -1986,9 +2003,12 @@ async function onSetupSave(){
 // --- edição manual ---
 function openEditModal(dateKey){
   const key = dateKey || todayKey();
-  if(records[key] && records[key].pendingRequest){
+  if(records[key] && records[key].pendingRequest && !pendingRequestExpirado(records[key])){
     showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
     return;
+  }
+  if(records[key] && records[key].pendingRequest && pendingRequestExpirado(records[key])){
+    showToast('O pedido anterior desse dia passou de 24h sem resposta — você pode enviar um novo.', 5000);
   }
   const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
   document.getElementById('editDate').value = key;
@@ -2058,6 +2078,11 @@ async function saveManualEdit(){
   await createSolicitacao({
     nomeFuncionario: profile ? profile.nome : '',
     dateKey: key, tipo:'edicao', antigo, novo, justificativa
+  }).then(async (novoId)=>{
+    if(novoId && records[key] && records[key].pendingRequest){
+      records[key].pendingRequest.solicitacaoId = novoId;
+      await saveRecords();
+    }
   });
   btn.disabled = false;
   btn.textContent = 'Enviar para aprovação';

@@ -563,7 +563,14 @@ async function resolverSolicitacao(id, uid, aprovar){
   // aplica (ou não) no ponto-records do funcionário
   const records = await fetchRecords(uid);
   const rec = records[s.dateKey];
-  if(aprovar){
+  // Se o funcionário já mandou um pedido mais novo pro mesmo dia (o pendingRequest
+  // atual tem um solicitacaoId diferente deste), esta solicitação está desatualizada
+  // — resolver ela não deve mexer no valor batido, senão um pedido antigo aprovado
+  // fora de ordem pisaria em cima do pedido mais recente.
+  const desatualizada = !!(rec && rec.pendingRequest && rec.pendingRequest.solicitacaoId && rec.pendingRequest.solicitacaoId !== id);
+  if(desatualizada){
+    showToast('Essa solicitação já foi substituída por um pedido mais recente do mesmo dia — nada foi alterado.', 6500);
+  }else if(aprovar){
     if(s.tipo === 'exclusao'){
       delete records[s.dateKey];
     }else{
@@ -578,11 +585,37 @@ async function resolverSolicitacao(id, uid, aprovar){
     // foi recusado antes de sumir de vez.
     records[s.dateKey] = rec;
   }
-  await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, {
-    method:'PATCH',
-    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-    body: JSON.stringify({ fields:{ value:{ stringValue: JSON.stringify(records) }, updatedAt:{ timestampValue:new Date().toISOString() } } })
-  });
+
+  // Grava o novo horário — e AGORA confere se a gravação realmente funcionou.
+  // Antes, se essa chamada falhasse (ex.: permissão negada nas regras do
+  // Firestore), o código seguia em frente do mesmo jeito: marcava a
+  // solicitação como resolvida e mostrava "aprovada" mesmo sem o horário
+  // ter sido realmente alterado.
+  let gravouOk = true;
+  if(!desatualizada){
+    try{
+      const patchRes = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, {
+        method:'PATCH',
+        headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ fields:{ value:{ stringValue: JSON.stringify(records) }, updatedAt:{ timestampValue:new Date().toISOString() } } })
+      });
+      if(!patchRes.ok){
+        gravouOk = false;
+        let detail = '';
+        try{ const errBody = await patchRes.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
+        showToast(`Não deu pra aplicar o horário (HTTP ${patchRes.status}${detail}). A solicitação continua pendente — verifique as regras do Firestore.`, 9000);
+      }
+    }catch(e){
+      gravouOk = false;
+      showToast('Erro de rede ao aplicar o horário. A solicitação continua pendente.', 7000);
+    }
+  }
+  if(!gravouOk){
+    // não marca como resolvida — fica pendente pra tentar de novo depois de
+    // corrigir o problema, em vez de sumir da lista sem o horário ter mudado.
+    await loadSolicitacoes();
+    return;
+  }
 
   // marca a solicitação como resolvida
   await fetch(`${FIRESTORE_REST_BASE}/solicitacoes/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=respondidoEm`, {
@@ -591,7 +624,7 @@ async function resolverSolicitacao(id, uid, aprovar){
     body: JSON.stringify({ fields: objToFirestoreFields({ status: aprovar?'aprovado':'rejeitado', respondidoEm:new Date().toISOString() }) })
   });
 
-  showToast(aprovar ? 'Solicitação aprovada.' : 'Solicitação rejeitada.');
+  if(!desatualizada) showToast(aprovar ? 'Solicitação aprovada.' : 'Solicitação rejeitada.');
   await loadSolicitacoes();
   if(currentDetailUid === uid) await renderMonth();
 }
@@ -883,6 +916,36 @@ async function runDiagnostico(){
     linhas.push(t3.slice(0, 300));
   }catch(e){
     linhas.push('3) erro de rede: ' + e.message);
+  }
+
+  linhas.push('');
+
+  // 4) Testa se o ADM consegue GRAVAR em users/{uid}/appdata/ponto-records
+  // de outro funcionário — é exatamente essa gravação que acontece ao
+  // aprovar uma solicitação. Pra não arriscar os dados reais, ele lê o
+  // valor atual e grava o MESMO valor de volta, sem mudar nada.
+  try{
+    const testUid = 'AkHK7r6dTxPNAZiScTWt9Jd647H3';
+    const getR = await fetch(`${FIRESTORE_REST_BASE}/users/${testUid}/appdata/ponto-records`, { headers:{ Authorization:`Bearer ${token}` } });
+    if(getR.status === 404){
+      linhas.push('4) esse funcionário ainda não tem ponto-records — pulei o teste de escrita.');
+    }else if(!getR.ok){
+      linhas.push(`4) não consegui nem LER ponto-records desse funcionário pra testar -> HTTP ${getR.status}`);
+    }else{
+      const curData = await getR.json();
+      const curVal = curData.fields && curData.fields.value ? curData.fields.value.stringValue : '{}';
+      const w = await fetch(`${FIRESTORE_REST_BASE}/users/${testUid}/appdata/ponto-records`, {
+        method:'PATCH',
+        headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ fields:{ value:{ stringValue: curVal }, updatedAt: curData.fields.updatedAt || { timestampValue:new Date().toISOString() } } })
+      });
+      const wt = await w.text();
+      linhas.push(`4) PATCH /users/${testUid}/appdata/ponto-records (grava o mesmo valor de volta, nada muda) -> HTTP ${w.status}`);
+      linhas.push(wt.slice(0, 300));
+      if(!w.ok) linhas.push('   ^ HTTP diferente de 200 aqui = as regras do Firestore não deixam o ADM escrever no ponto-records de outros funcionários. É por isso que aprovar não muda o horário.');
+    }
+  }catch(e){
+    linhas.push('4) erro de rede: ' + e.message);
   }
 
   out.textContent = linhas.join('\n');
