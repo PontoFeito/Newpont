@@ -531,7 +531,6 @@ tr:last-child td{border-bottom:none;}
 
       <div class="drawer-section">
         <div class="drawer-section-title">Remuneração</div>
-        <button class="drawer-item" id="menuPayrollSetupBtn"><span class="ic">💰</span> Configurar remuneração</button>
         <button class="drawer-item" id="menuPayrollSummaryBtn"><span class="ic">📊</span> Ver fechamento do mês</button>
       </div>
 
@@ -671,6 +670,17 @@ tr:last-child td{border-bottom:none;}
       <button class="confirm" id="authSubmit" style="width:100%;">Entrar</button>
     </div>
     <p class="hint-text" style="margin-top:14px;">Sua conta é criada pelo administrador. Se ainda não recebeu um acesso, fale com ele.</p>
+  </div>
+</div>
+
+<!-- bloqueio: cadastro não liberado ou acesso encerrado -->
+<div class="modal-overlay" id="blockedOverlay" style="z-index:100;">
+  <div class="modal modal-wide">
+    <h3 id="blockedTitle">Acesso bloqueado</h3>
+    <p class="hint-text" id="blockedMessage">—</p>
+    <div class="modal-actions">
+      <button class="confirm" id="blockedLogoutBtn" style="width:100%;">Sair</button>
+    </div>
   </div>
 </div>
 
@@ -814,66 +824,14 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
-<!-- configurar dados de remuneração -->
-<div class="modal-overlay" id="payrollSetupOverlay">
-  <div class="modal modal-wide" style="max-height:85vh; overflow-y:auto;">
-    <h3>Configurar remuneração</h3>
-    <p class="hint-text">Preencha uma vez. Os dias úteis do mês (segunda a sexta) são calculados automaticamente pelo calendário.</p>
-    <div class="field-row">
-      <label for="pSalario">Salário mensal (R$)</label>
-      <input type="number" step="0.01" min="0" id="pSalario" placeholder="Ex.: 1500.00">
-    </div>
-    <div class="field-row">
-      <label for="pVA">Vale Alimentação por dia trabalhado (R$)</label>
-      <input type="number" step="0.01" min="0" id="pVA" placeholder="Ex.: 25.00">
-    </div>
-    <div class="field-row">
-      <label for="pVC">Vale Combustível por dia trabalhado (R$)</label>
-      <input type="number" step="0.01" min="0" id="pVC" placeholder="Ex.: 15.00">
-    </div>
-
-    <div class="field-row" style="border-top:1.5px solid var(--line); padding-top:12px; margin-top:4px;">
-      <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--ink);">
-        <input type="checkbox" id="pIsCLT" style="width:auto;">
-        Sou CLT (calcular INSS, FGTS e Vale Transporte)
-      </label>
-    </div>
-
-    <div id="cltFields" style="display:none;">
-      <p class="hint-text" style="margin-top:0;">O INSS é descontado do salário automaticamente pela tabela vigente. O FGTS é informativo (depositado pelo empregador, não sai do seu salário).</p>
-      <div class="field-row">
-        <label style="display:flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--ink);">
-          <input type="checkbox" id="pVTAtivo" style="width:auto;">
-          Uso vale transporte
-        </label>
-      </div>
-      <div id="vtFields" style="display:none;">
-        <div class="field-row">
-          <label for="pVTValorDia">Valor do vale transporte por dia (R$)</label>
-          <input type="number" step="0.01" min="0" id="pVTValorDia" placeholder="Ex.: 8.80">
-        </div>
-        <div class="field-row">
-          <label for="pVTPercentual">Percentual descontado do salário (%)</label>
-          <input type="number" step="0.1" min="0" max="100" id="pVTPercentual" placeholder="Ex.: 6 (padrão legal é até 6%)">
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="cancel" id="payrollSetupCancel">Cancelar</button>
-      <button class="confirm" id="payrollSetupSave">Salvar</button>
-    </div>
-  </div>
-</div>
-
 <!-- fechamento do mês -->
 <div class="modal-overlay" id="payrollOverlay">
   <div class="modal modal-wide">
     <h3 id="payrollTitle">Fechamento do mês</h3>
     <div class="receipt" id="payrollReceipt"></div>
+    <p class="hint-text">Os valores são configurados pelo administrador. Se algo estiver errado, fale com ele.</p>
     <div class="modal-actions">
-      <button class="cancel" id="payrollEditData">Editar valores</button>
-      <button class="confirm" id="payrollClose">Fechar</button>
+      <button class="confirm" id="payrollClose" style="width:100%;">Fechar</button>
     </div>
   </div>
 </div>
@@ -952,15 +910,13 @@ const auth = firebase.auth();
 
 const STORAGE_KEY = 'ponto-records';
 const SECURITY_KEY = 'ponto-security';
-const PAYROLL_KEY = 'ponto-payroll';
 const PROFILE_KEY = 'ponto-perfil';
 const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
 const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
 let records = {};
 let security = null; // {passwordHash, question, answerHash}
-let payroll = null; // {salario, va, vc} — dias úteis são calculados automaticamente pelo calendário
 let profile = null; // {nome}
-let employee = null; // {nome, identifier, status:'ativo'|'demitido', demitidoEm, tipoPagamento:'mensalista'|'diarista', diariaValores:{4,6,8}}
+let employee = null; // {nome, identifier, status:'ativo'|'demitido', demitidoEm, tipoPagamento:'estagiario'|'clt'|'diarista', salario, va, vtAtivo, vtValorDia, vtPercentual, diariaValores:{4,6,8}}
 let viewMonth = null; // 'YYYY-MM'
 let pendingAction = null; // 'edit' | 'changePassword'
 let pendingEditDate = null;
@@ -1381,7 +1337,6 @@ function hydrateFromCache(){
   try{
     const r = readCache(STORAGE_KEY); if(r) records = JSON.parse(r);
     const s = readCache(SECURITY_KEY); if(s) security = JSON.parse(s);
-    const p = readCache(PAYROLL_KEY); if(p) payroll = JSON.parse(p);
     const pr = readCache(PROFILE_KEY); if(pr) profile = JSON.parse(pr);
   }catch(e){
     // cache corrompido — ignora e deixa a busca no servidor preencher tudo
@@ -1401,6 +1356,26 @@ async function saveRecords(){
   if(!ok) showToast('Não foi possível salvar (' + (lastStorageError||'erro desconhecido') + ').', 6000);
   return ok;
 }
+// Quando o ADM recusa um pedido de ajuste/exclusão, ele marca o dia com
+// "avisoRecusado". Aqui a gente confere isso ao abrir o app, mostra um
+// aviso pra pessoa saber, e depois apaga a marca (senão avisaria de novo
+// toda vez que abrisse o app).
+async function checkAvisosRecusados(){
+  const diasComAviso = Object.keys(records).filter(k=>records[k] && records[k].avisoRecusado);
+  if(diasComAviso.length===0) return;
+  if(diasComAviso.length===1){
+    showToast(`Sua solicitação de ajuste do dia ${displayDateShort(diasComAviso[0])} foi recusada pelo administrador.`, 8000);
+  }else{
+    showToast(`${diasComAviso.length} solicitações de ajuste foram recusadas pelo administrador.`, 8000);
+  }
+  diasComAviso.forEach(k=>{
+    delete records[k].avisoRecusado;
+    const rec = records[k];
+    const semDados = !rec.entrada && !rec.almocoSaida && !rec.almocoVolta && !rec.saida && !rec.falta;
+    if(semDados) delete records[k];
+  });
+  await saveRecords();
+}
 async function loadSecurity(){
   try{
     const res = await storageGet(SECURITY_KEY);
@@ -1415,23 +1390,6 @@ async function saveSecurity(sec){
     security = sec;
   }else{
     showToast('Não foi possível salvar a senha (' + (lastStorageError||'erro desconhecido') + ').', 6000);
-  }
-  return ok;
-}
-async function loadPayroll(){
-  try{
-    const res = await storageGet(PAYROLL_KEY);
-    payroll = res && res.value ? JSON.parse(res.value) : null;
-  }catch(e){
-    payroll = null;
-  }
-}
-async function savePayroll(p){
-  const ok = await storageSet(PAYROLL_KEY, JSON.stringify(p));
-  if(ok){
-    payroll = p;
-  }else{
-    showToast('Não foi possível salvar os dados de remuneração (' + (lastStorageError||'erro desconhecido') + ').', 6000);
   }
   return ok;
 }
@@ -2086,51 +2044,7 @@ async function saveManualEdit(){
   showToast(`Solicitação enviada para ${displayDateShort(key)}. Aguardando aprovação do administrador.`, 5000);
 }
 
-// --- fechamento do mês / remuneração ---
-function toggleCLTFields(){
-  const isCLT = document.getElementById('pIsCLT').checked;
-  document.getElementById('cltFields').style.display = isCLT ? 'block' : 'none';
-}
-function toggleVTFields(){
-  const ativo = document.getElementById('pVTAtivo').checked;
-  document.getElementById('vtFields').style.display = ativo ? 'block' : 'none';
-}
-function openPayrollSetup(){
-  document.getElementById('pSalario').value = payroll ? payroll.salario : '';
-  document.getElementById('pVA').value = payroll ? payroll.va : '';
-  document.getElementById('pVC').value = payroll ? payroll.vc : '';
-  document.getElementById('pIsCLT').checked = !!(payroll && payroll.isCLT);
-  document.getElementById('pVTAtivo').checked = !!(payroll && payroll.vtAtivo);
-  document.getElementById('pVTValorDia').value = payroll && payroll.vtValorDia ? payroll.vtValorDia : '';
-  document.getElementById('pVTPercentual').value = payroll && payroll.vtPercentual ? payroll.vtPercentual : '';
-  toggleCLTFields();
-  toggleVTFields();
-  document.getElementById('payrollSetupOverlay').classList.add('show');
-}
-function closePayrollSetup(){
-  document.getElementById('payrollSetupOverlay').classList.remove('show');
-}
-async function onPayrollSetupSave(){
-  const salario = parseFloat(document.getElementById('pSalario').value);
-  const va = parseFloat(document.getElementById('pVA').value) || 0;
-  const vc = parseFloat(document.getElementById('pVC').value) || 0;
-  const isCLT = document.getElementById('pIsCLT').checked;
-  const vtAtivo = isCLT && document.getElementById('pVTAtivo').checked;
-  const vtValorDia = vtAtivo ? (parseFloat(document.getElementById('pVTValorDia').value) || 0) : 0;
-  const vtPercentual = vtAtivo ? (parseFloat(document.getElementById('pVTPercentual').value) || 0) : 0;
-  if(!salario || salario<=0){ showToast('Informe um salário válido.'); return; }
-  if(vtAtivo && (!vtValorDia || !vtPercentual)){ showToast('Preencha o valor do vale transporte e o percentual descontado.'); return; }
-  const btn = document.getElementById('payrollSetupSave');
-  btn.disabled = true;
-  btn.textContent = 'Salvando...';
-  const ok = await savePayroll({salario, va, vc, isCLT, vtAtivo, vtValorDia, vtPercentual});
-  btn.disabled = false;
-  btn.textContent = 'Salvar';
-  if(!ok) return;
-  closePayrollSetup();
-  showToast('Dados de remuneração salvos.');
-  openPayrollSummary();
-}
+// --- fechamento do mês / remuneração (configurada pelo administrador) ---
 
 // Tabela INSS 2026 (progressiva): faixa;alíquota
 function calcINSS(salarioBase){
@@ -2180,11 +2094,32 @@ function computePayrollBreakdown(mk){
   const diasUteis = diasUteisNoMes(mk);
   const dias = diasTrabalhadosNoMes(mk);
   const faltas = faltasNoMes(mk);
-  const diaValor = payroll.salario / diasUteis;
-  let salarioMes = diaValor * dias;
-  if(dias >= diasUteis) salarioMes = payroll.salario;
-  const vaMes = payroll.va * dias;
-  const vcMes = payroll.vc * dias;
+  const tipo = employee ? employee.tipoPagamento : null;
+  const isCLT = tipo === 'clt' || tipo === 'mensalista'; // 'mensalista' é o nome antigo do CLT
+  const isDiaristaTipo = tipo === 'diarista';
+
+  let salarioMes = 0;
+  if(isDiaristaTipo){
+    // soma o valor da diária de cada dia trabalhado, pela faixa de horas batidas naquele dia
+    const dv = (employee && employee.diariaValores) || {};
+    Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
+      const rec = records[k];
+      const t = calcTotal(rec);
+      if(t && !t.falta && rec.entrada && rec.saida){
+        const horas = t.mins/60;
+        const faixa = horas>=8 ? 8 : (horas>=6 ? 6 : 4);
+        salarioMes += Number(dv[faixa] || dv[String(faixa)] || 0);
+      }
+    });
+  }else{
+    const salario = (employee && employee.salario) || 0;
+    const diaValor = diasUteis>0 ? salario/diasUteis : 0;
+    salarioMes = diaValor * dias;
+    if(dias >= diasUteis) salarioMes = salario;
+  }
+
+  const va = (employee && employee.va) || 0;
+  const vaMes = va * dias;
 
   let extraMesMins = 0;
   Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
@@ -2192,29 +2127,32 @@ function computePayrollBreakdown(mk){
     if(t && !t.falta) extraMesMins += t.extraMins;
   });
 
-  const out = { diasUteis, dias, faltas, salarioMes, vaMes, vcMes, extraMesMins, isCLT: !!payroll.isCLT };
+  const out = { diasUteis, dias, faltas, salarioMes, vaMes, extraMesMins, isCLT, isDiaristaTipo };
 
-  if(payroll.isCLT){
+  const vtAtivo = !!(employee && employee.vtAtivo);
+  if(vtAtivo){
+    const vtValorDia = (employee && employee.vtValorDia) || 0;
+    const vtPercentual = (employee && employee.vtPercentual) || 0;
+    out.vtMes = vtValorDia * dias;
+    out.descontoVT = calcDescontoVT(salarioMes, out.vtMes, vtPercentual);
+  }else{
+    out.vtMes = 0;
+    out.descontoVT = 0;
+  }
+
+  if(isCLT){
     out.inss = calcINSS(salarioMes);
     out.fgts = calcFGTS(salarioMes);
-    if(payroll.vtAtivo){
-      const vtMes = payroll.vtValorDia * dias;
-      out.vtMes = vtMes;
-      out.descontoVT = calcDescontoVT(salarioMes, vtMes, payroll.vtPercentual);
-    }else{
-      out.vtMes = 0;
-      out.descontoVT = 0;
-    }
     out.salarioLiquido = salarioMes - out.inss - out.descontoVT;
-    out.totalMes = out.salarioLiquido + vaMes + vcMes;
   }else{
-    out.totalMes = salarioMes + vaMes + vcMes;
+    out.salarioLiquido = salarioMes - out.descontoVT;
   }
+  out.totalMes = out.salarioLiquido + vaMes;
   return out;
 }
 
 function openPayrollSummary(){
-  if(!payroll){ openPayrollSetup(); return; }
+  if(!employee){ showToast('Seu cadastro de pagamento ainda não foi configurado pelo administrador.'); return; }
   const mk = viewMonth;
   const b = computePayrollBreakdown(mk);
 
@@ -2223,18 +2161,15 @@ function openPayrollSummary(){
     <div class="receipt-row"><span class="r-label">Dias úteis no mês (seg. a sex.)</span><span class="r-value">${b.diasUteis}</span></div>
     <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${b.dias} de ${b.diasUteis}</span></div>
     <div class="receipt-row"><span class="r-label">Faltas registradas</span><span class="r-value">${b.faltas}</span></div>
-    <div class="receipt-row"><span class="r-label">Salário bruto (proporcional)</span><span class="r-value">${formatBRL(b.salarioMes)}</span></div>
-    ${b.isCLT ? `
-    <div class="receipt-row"><span class="r-label">INSS (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.inss)}</span></div>
+    <div class="receipt-row"><span class="r-label">${b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)'}</span><span class="r-value">${formatBRL(b.salarioMes)}</span></div>
+    ${b.isCLT ? `<div class="receipt-row"><span class="r-label">INSS (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.inss)}</span></div>` : ''}
     ${b.descontoVT>0 ? `<div class="receipt-row"><span class="r-label">Vale Transporte (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.descontoVT)}</span></div>` : ''}
-    <div class="receipt-row"><span class="r-label">Salário líquido</span><span class="r-value">${formatBRL(b.salarioLiquido)}</span></div>
-    ` : ''}
+    <div class="receipt-row"><span class="r-label">Líquido</span><span class="r-value">${formatBRL(b.salarioLiquido)}</span></div>
     <div class="receipt-row"><span class="r-label">Vale Alimentação</span><span class="r-value">${formatBRL(b.vaMes)}</span></div>
-    <div class="receipt-row"><span class="r-label">Vale Combustível</span><span class="r-value">${formatBRL(b.vcMes)}</span></div>
     <div class="receipt-row total"><span class="r-label">Total do mês (a receber)</span><span class="r-value">${formatBRL(b.totalMes)}</span></div>
     ${b.isCLT ? `<div class="receipt-row"><span class="r-label">FGTS depositado (informativo)</span><span class="r-value">${formatBRL(b.fgts)}</span></div>` : ''}
     ${b.extraMesMins>0 ? `<div class="receipt-row"><span class="r-label">Hora extra no mês</span><span class="r-value" style="color:var(--stamp-red);">${formatMinutes(b.extraMesMins)}</span></div>` : ''}
-    <div class="receipt-note">Dias úteis calculados automaticamente pelo calendário (segunda a sexta). Hora extra é apenas informativa: não entra na conta do salário, pois não é remunerada.${b.isCLT ? ' INSS calculado pela tabela progressiva vigente; FGTS é depositado pelo empregador e não é descontado do seu salário.' : ''}</div>
+    <div class="receipt-note">Valores configurados pelo administrador. Dias úteis calculados automaticamente pelo calendário (segunda a sexta).${b.isCLT ? ' INSS calculado pela tabela progressiva vigente; FGTS é depositado pelo empregador e não é descontado do seu salário.' : ''}</div>
   `;
   document.getElementById('payrollOverlay').classList.add('show');
 }
@@ -2244,7 +2179,7 @@ function closePayrollSummary(){
 
 function maybeAutoShowPayroll(){
   const d = new Date();
-  if(d.getDate() >= 30 && payroll){
+  if(d.getDate() >= 30 && employee){
     const flagKey = 'ponto-payroll-shown-'+todayKey();
     if(!sessionStorage.getItem(flagKey)){
       sessionStorage.setItem(flagKey, '1');
@@ -2403,21 +2338,18 @@ function buildReportRows(){
 }
 
 function payrollBreakdownPairs(mk){
-  if(!payroll) return null;
+  if(!employee) return null;
   const b = computePayrollBreakdown(mk);
   const pairs = [
     ['Dias úteis no mês', String(b.diasUteis)],
     ['Dias trabalhados', `${b.dias} de ${b.diasUteis}`],
     ['Faltas registradas', String(b.faltas)],
-    ['Salário bruto (proporcional)', formatBRL(b.salarioMes)],
+    [b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)', formatBRL(b.salarioMes)],
   ];
-  if(b.isCLT){
-    pairs.push(['INSS (desconto)', '-' + formatBRL(b.inss)]);
-    if(b.descontoVT>0) pairs.push(['Vale Transporte (desconto)', '-' + formatBRL(b.descontoVT)]);
-    pairs.push(['Salário líquido', formatBRL(b.salarioLiquido)]);
-  }
+  if(b.isCLT) pairs.push(['INSS (desconto)', '-' + formatBRL(b.inss)]);
+  if(b.descontoVT>0) pairs.push(['Vale Transporte (desconto)', '-' + formatBRL(b.descontoVT)]);
+  pairs.push(['Líquido', formatBRL(b.salarioLiquido)]);
   pairs.push(['Vale Alimentação', formatBRL(b.vaMes)]);
-  pairs.push(['Vale Combustível', formatBRL(b.vcMes)]);
   pairs.push(['Total do mês (a receber)', formatBRL(b.totalMes)]);
   if(b.isCLT) pairs.push(['FGTS depositado (informativo)', formatBRL(b.fgts)]);
   return pairs;
@@ -2426,7 +2358,7 @@ function payrollBreakdownPairs(mk){
 async function exportA4(){
   const rows = buildReportRows();
   if(rows.length===0){ showToast('Não há registros para exportar.'); return; }
-  const includePayroll = payroll ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
+  const includePayroll = employee ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
   const nome = profile && profile.nome ? profile.nome : 'Não informado';
   const win = window.open('', '_blank');
   if(!win){ showToast('Permita pop-ups no navegador para exportar em A4.', 4000); return; }
@@ -2481,7 +2413,7 @@ async function exportA4(){
 async function exportExcel(){
   const rows = buildReportRows();
   if(rows.length===0){ showToast('Não há registros para exportar.'); return; }
-  const includePayroll = payroll ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
+  const includePayroll = employee ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
   const nome = profile && profile.nome ? profile.nome : 'Não informado';
   const bodyRows = rows.map(({key, rec, tot, isFalta})=>{
     if(isFalta){
@@ -2633,12 +2565,7 @@ on('deleteJustSend', 'click', sendDeleteRequest);
 on('editDate', 'change', (e)=>loadRecordIntoEditForm(e.target.value));
 on('editFalta', 'change', toggleEditFaltaFields);
 
-on('payrollSetupCancel', 'click', closePayrollSetup);
-on('payrollSetupSave', 'click', onPayrollSetupSave);
-on('pIsCLT', 'change', toggleCLTFields);
-on('pVTAtivo', 'change', toggleVTFields);
 on('payrollClose', 'click', closePayrollSummary);
-on('payrollEditData', 'click', ()=>{ closePayrollSummary(); openPayrollSetup(); });
 
 // --- menu lateral (☰) ---
 on('menuBtn', 'click', openDrawer);
@@ -2652,7 +2579,6 @@ on('locationsCancel', 'click', closeLocationsModal);
 on('locationsSearch', 'click', searchLocations);
 on('menuEditNameBtn', 'click', ()=>{ closeDrawer(); openNamePrompt(); });
 on('menuPasswordBtn', 'click', ()=>{ closeDrawer(); requestPasswordThen('changePassword'); });
-on('menuPayrollSetupBtn', 'click', ()=>{ closeDrawer(); openPayrollSetup(); });
 on('menuPayrollSummaryBtn', 'click', ()=>{ closeDrawer(); openPayrollSummary(); });
 on('menuExportCsvBtn', 'click', ()=>{ closeDrawer(); exportCSV(); });
 on('menuImportCsvBtn', 'click', ()=>{ closeDrawer(); document.getElementById('importCsvInput').click(); });
@@ -2665,6 +2591,7 @@ on('importCsvInput', 'change', async (e)=>{
 on('menuExportA4Btn', 'click', ()=>{ closeDrawer(); exportA4(); });
 on('menuExportExcelBtn', 'click', ()=>{ closeDrawer(); exportExcel(); });
 on('menuLogoutBtn', 'click', ()=>{ closeDrawer(); onLogout(); });
+on('blockedLogoutBtn', 'click', onLogout);
 on('menuSwitchAccountBtn', 'click', ()=>{ closeDrawer(); onLogout(); });
 
 const daysBtn = document.getElementById('daysBtn');
@@ -2706,6 +2633,14 @@ function showAuthOverlay(){
 function hideAuthOverlay(){
   document.getElementById('authOverlay').classList.remove('show');
   clearAuthFields();
+}
+function showBlockedOverlay(title, message){
+  document.getElementById('blockedTitle').textContent = title;
+  document.getElementById('blockedMessage').textContent = message;
+  document.getElementById('blockedOverlay').classList.add('show');
+}
+function hideBlockedOverlay(){
+  document.getElementById('blockedOverlay').classList.remove('show');
 }
 function setIdType(type){
   idType = type;
@@ -2806,25 +2741,24 @@ async function startApp(){
 
   // Fase 2: busca a versão mais atual no servidor (em paralelo, não em
   // sequência) e atualiza a tela de novo se algo tiver mudado.
-  await Promise.all([loadRecords(), loadSecurity(), loadPayroll(), loadProfile()]);
+  await Promise.all([loadRecords(), loadSecurity(), loadProfile()]);
   const authEmailAtual = auth.currentUser ? auth.currentUser.email : '';
   await ensureEmployeeDoc(profile ? profile.nome : '', authEmailAtual);
+  await checkAvisosRecusados();
   renderProfile();
   renderToday();
   renderHistory();
   if(isDemitido()){
-    showToast('Seu acesso para bater ponto foi encerrado. Fale com o responsável.', 8000);
+    showBlockedOverlay('Acesso encerrado', 'Seu acesso para bater ponto foi encerrado. Fale com o responsável.');
   }else if(!temCadastroLiberado()){
-    showToast('Seu cadastro ainda não foi liberado pelo administrador.', 8000);
+    showBlockedOverlay('Cadastro pendente', 'Seu cadastro ainda não foi liberado pelo administrador. Fale com ele para começar a usar o app.');
+  }else{
+    hideBlockedOverlay();
   }
   if(!profile){
     openNamePrompt();
   }
-  if(!payroll){
-    openPayrollSetup();
-  }else{
-    maybeAutoShowPayroll();
-  }
+  maybeAutoShowPayroll();
   if('serviceWorker' in navigator){
     try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ /* opcional */ }
   }
@@ -2841,7 +2775,8 @@ auth.onAuthStateChanged((user)=>{
     startApp();
   }else{
     appStarted = false;
-    records = {}; security = null; payroll = null; profile = null;
+    records = {}; security = null; profile = null; employee = null;
+    hideBlockedOverlay();
     showAuthOverlay();
   }
 });

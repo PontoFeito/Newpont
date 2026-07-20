@@ -125,7 +125,6 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
       <input type="password" id="adminPassword" autocomplete="current-password">
     </div>
     <button class="btn" id="loginBtn">Entrar</button>
-    <button class="link-btn" id="toggleCreateBtn" style="margin-top:10px; display:block;">Primeira vez? Criar a conta do ADM</button>
     <div class="error-text" id="loginError"></div>
   </div>
 
@@ -221,20 +220,42 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
 
 <!-- modal: configurar pagamento -->
 <div class="modal-overlay" id="payConfigOverlay">
-  <div class="modal">
+  <div class="modal" style="max-height:85vh; overflow-y:auto;">
     <h3>Configurar pagamento</h3>
     <div class="field-row">
-      <label for="tipoPagamentoSelect">Tipo de pagamento</label>
+      <label for="tipoPagamentoSelect">Tipo de vínculo</label>
       <select id="tipoPagamentoSelect">
-        <option value="mensalista">Mensalista (CLT)</option>
+        <option value="estagiario">Estagiário</option>
+        <option value="clt">CLT</option>
         <option value="diarista">Diarista</option>
       </select>
     </div>
+
+    <div id="salarioFields">
+      <div class="field-row"><label for="salarioMensal">Salário mensal (R$)</label><input type="number" id="salarioMensal" step="0.01" min="0"></div>
+    </div>
+
     <div id="diaristaFields">
       <div class="field-row"><label for="valor4h">Valor da diária de 4 horas (R$)</label><input type="number" id="valor4h" step="0.01" min="0"></div>
       <div class="field-row"><label for="valor6h">Valor da diária de 6 horas (R$)</label><input type="number" id="valor6h" step="0.01" min="0"></div>
       <div class="field-row"><label for="valor8h">Valor da diária de 8 horas (R$)</label><input type="number" id="valor8h" step="0.01" min="0"></div>
     </div>
+
+    <div class="field-row"><label for="vaValorDia">Vale Alimentação por dia trabalhado (R$)</label><input type="number" id="vaValorDia" step="0.01" min="0"></div>
+
+    <div class="field-row" style="border-top:1.5px solid var(--line); padding-top:12px;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="vtAtivoCheck" style="width:auto;">
+        Usa vale transporte
+      </label>
+    </div>
+    <div id="vtFields" style="display:none;">
+      <div class="field-row"><label for="vtValorDia">Valor do vale transporte por dia (R$)</label><input type="number" id="vtValorDia" step="0.01" min="0"></div>
+      <div class="field-row"><label for="vtPercentual">Percentual descontado do salário (%)</label><input type="number" id="vtPercentual" step="0.1" min="0" max="100" placeholder="Ex.: 6 (padrão legal é até 6%)"></div>
+    </div>
+
+    <p class="hint-text" id="cltHint" style="display:none;">Como é CLT, o INSS é descontado automaticamente pela tabela vigente, e o FGTS (informativo) é calculado também.</p>
+
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="btn outline" id="payConfigCancel">Cancelar</button>
       <button class="btn" id="payConfigSave">Salvar</button>
@@ -269,7 +290,6 @@ const RETENCAO_DIAS_APOS_DEMISSAO = 90; // três meses
 let employees = []; // lista carregada da coleção employees
 let currentDetailUid = null;
 let viewMonth = null;
-let createMode = false;
 
 function pad(n){ return String(n).padStart(2,'0'); }
 function showToast(msg, ms=3500){
@@ -414,7 +434,7 @@ async function criarFuncionario(){
     }
     const fields = {
       nome, identifier: authEmail, status:'ativo', demitidoEm:null,
-      tipoPagamento:'mensalista', diariaValores:{'4':0,'6':0,'8':0},
+      tipoPagamento:'estagiario', salario:0, va:0, vtAtivo:false, vtValorDia:0, vtPercentual:0, diariaValores:{'4':0,'6':0,'8':0},
       createdAt: new Date().toISOString()
     };
     const token = await authToken();
@@ -551,8 +571,12 @@ async function resolverSolicitacao(id, uid, aprovar){
     }
   }else if(rec && rec.pendingRequest){
     delete rec.pendingRequest;
+    rec.avisoRecusado = { justificativa: s.justificativa||'', quando: new Date().toISOString() };
     const semDados = !rec.entrada && !rec.almocoSaida && !rec.almocoVolta && !rec.saida && !rec.falta;
-    if(semDados) delete records[s.dateKey]; else records[s.dateKey] = rec;
+    // mesmo sem horários (dia que só existia pra pedir exclusão), mantém
+    // o registro só pra guardar o aviso — o funcionário precisa ver que
+    // foi recusado antes de sumir de vez.
+    records[s.dateKey] = rec;
   }
   await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, {
     method:'PATCH',
@@ -618,7 +642,7 @@ function renderEmployeesTable(){
       <td>${e.nome||'—'}</td>
       <td>${e.identifier||'—'}</td>
       <td><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span></td>
-      <td>${e.tipoPagamento==='diarista'?'Diarista':'Mensalista'}</td>
+      <td>${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}</td>
       <td><button class="btn small outline" data-uid="${e.uid}">Ver</button></td>
     </tr>`).join('')}
   </tbody></table>`;
@@ -652,7 +676,7 @@ async function openDetail(uid){
   document.getElementById('listCard').classList.add('hidden');
   document.getElementById('detailCard').classList.remove('hidden');
   document.getElementById('detailNome').textContent = e.nome || '—';
-  document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span> · ${e.tipoPagamento==='diarista'?'Diarista':'Mensalista'}`;
+  document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span> · ${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}`;
   viewMonth = new Date().toISOString().slice(0,7);
   await renderMonth();
 }
@@ -750,27 +774,48 @@ async function readmitir(){
 // --- configurar pagamento / diária ---
 function openPayConfig(){
   const e = employees.find(x=>x.uid===currentDetailUid);
-  document.getElementById('tipoPagamentoSelect').value = e.tipoPagamento || 'mensalista';
+  const tipo = e.tipoPagamento === 'mensalista' ? 'clt' : (e.tipoPagamento || 'estagiario'); // 'mensalista' era o nome antigo do CLT
+  document.getElementById('tipoPagamentoSelect').value = tipo;
+  document.getElementById('salarioMensal').value = e.salario || '';
   const dv = e.diariaValores || {};
   document.getElementById('valor4h').value = dv['4']||dv[4]||0;
   document.getElementById('valor6h').value = dv['6']||dv[6]||0;
   document.getElementById('valor8h').value = dv['8']||dv[8]||0;
-  toggleDiaristaFields();
+  document.getElementById('vaValorDia').value = e.va || '';
+  document.getElementById('vtAtivoCheck').checked = !!e.vtAtivo;
+  document.getElementById('vtValorDia').value = e.vtValorDia || '';
+  document.getElementById('vtPercentual').value = e.vtPercentual || '';
+  toggleTipoPagamentoFields();
   document.getElementById('payConfigOverlay').classList.add('show');
 }
-function toggleDiaristaFields(){
-  const sel = document.getElementById('tipoPagamentoSelect').value;
-  document.getElementById('diaristaFields').style.display = sel==='diarista' ? 'block' : 'none';
+function toggleTipoPagamentoFields(){
+  const tipo = document.getElementById('tipoPagamentoSelect').value;
+  document.getElementById('diaristaFields').style.display = tipo==='diarista' ? 'block' : 'none';
+  document.getElementById('salarioFields').style.display = tipo==='diarista' ? 'none' : 'block';
+  document.getElementById('cltHint').style.display = tipo==='clt' ? 'block' : 'none';
+}
+function toggleVTFields(){
+  document.getElementById('vtFields').style.display = document.getElementById('vtAtivoCheck').checked ? 'block' : 'none';
 }
 async function savePayConfig(){
   const tipo = document.getElementById('tipoPagamentoSelect').value;
-  const fields = { tipoPagamento: tipo };
+  const vtAtivo = document.getElementById('vtAtivoCheck').checked;
+  const fields = {
+    tipoPagamento: tipo,
+    va: Number(document.getElementById('vaValorDia').value) || 0,
+    vtAtivo,
+    vtValorDia: vtAtivo ? (Number(document.getElementById('vtValorDia').value) || 0) : 0,
+    vtPercentual: vtAtivo ? (Number(document.getElementById('vtPercentual').value) || 0) : 0,
+  };
   if(tipo === 'diarista'){
     fields.diariaValores = {
       '4': Number(document.getElementById('valor4h').value)||0,
       '6': Number(document.getElementById('valor6h').value)||0,
       '8': Number(document.getElementById('valor8h').value)||0
     };
+    fields.salario = 0;
+  }else{
+    fields.salario = Number(document.getElementById('salarioMensal').value) || 0;
   }
   const ok = await setEmployeeFields(currentDetailUid, fields);
   if(ok){
@@ -781,11 +826,6 @@ async function savePayConfig(){
 }
 
 // --- login do ADM (conta separada, só e-mail/senha) ---
-function setCreateMode(v){
-  createMode = v;
-  document.getElementById('toggleCreateBtn').textContent = v ? 'Já tenho conta, entrar' : 'Primeira vez? Criar a conta do ADM';
-  document.getElementById('loginBtn').textContent = v ? 'Criar conta' : 'Entrar';
-}
 async function onLogin(){
   const email = document.getElementById('adminEmail').value.trim();
   const senha = document.getElementById('adminPassword').value;
@@ -793,11 +833,7 @@ async function onLogin(){
   errEl.textContent = '';
   if(!email || !senha){ errEl.textContent = 'Preencha e-mail e senha.'; return; }
   try{
-    if(createMode){
-      await auth.createUserWithEmailAndPassword(email, senha);
-    }else{
-      await auth.signInWithEmailAndPassword(email, senha);
-    }
+    await auth.signInWithEmailAndPassword(email, senha);
   }catch(e){
     errEl.textContent = e.message || 'Erro ao entrar.';
   }
@@ -881,7 +917,6 @@ auth.onAuthStateChanged(async (user)=>{
 });
 
 on('loginBtn','click', onLogin);
-on('toggleCreateBtn','click', ()=>setCreateMode(!createMode));
 on('menuBtn','click', ()=>{
   document.getElementById('drawerAccountEmail').textContent = auth.currentUser ? auth.currentUser.email : '—';
   document.getElementById('drawerOverlay').classList.add('show');
@@ -907,7 +942,8 @@ on('readmitirBtn','click', readmitir);
 on('configPagamentoBtn','click', openPayConfig);
 on('payConfigCancel','click', ()=>document.getElementById('payConfigOverlay').classList.remove('show'));
 on('payConfigSave','click', savePayConfig);
-on('tipoPagamentoSelect','change', toggleDiaristaFields);
+on('tipoPagamentoSelect','change', toggleTipoPagamentoFields);
+on('vtAtivoCheck','change', toggleVTFields);
 on('prevMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,-1); renderMonth(); });
 on('nextMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,1); renderMonth(); });
 </script>
