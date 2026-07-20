@@ -853,8 +853,8 @@ tr:last-child td{border-bottom:none;}
 <!-- editar horários -->
 <div class="modal-overlay" id="editModalOverlay">
   <div class="modal modal-wide">
-    <h3>Solicitar ajuste de horários</h3>
-    <p class="hint-text">Isso não muda o ponto na hora — vira uma solicitação, e o administrador precisa aprovar.</p>
+    <h3 id="editModalTitle">Solicitar ajuste de horários</h3>
+    <p class="hint-text" id="editModalHint">Isso não muda o ponto na hora — vira uma solicitação, e o administrador precisa aprovar.</p>
     <div class="field-row">
       <label for="editDate">Data</label>
       <input type="date" id="editDate">
@@ -1298,6 +1298,21 @@ async function createSolicitacao(fields){
     await addIdToIndex('solicitacoes', novoId);
     return novoId;
   }catch(e){ return null; }
+}
+// Atualiza uma solicitação já existente (usado no ajuste único: a pessoa
+// corrige o pedido que já mandou, em vez de criar um pedido novo do zero).
+async function updateSolicitacao(id, fields){
+  if(!id) return false;
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const mask = Object.keys(fields).map(k=>`updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    const res = await fetch(`${FIRESTORE_REST_BASE}/solicitacoes/${id}?${mask}`, {
+      method:'PATCH',
+      headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ fields: objToFirestoreFields(fields) })
+    });
+    return res.ok;
+  }catch(e){ return false; }
 }
 
 // Só LÊ o employees/{uid} — quem cria é sempre o ADM, pelo painel dele.
@@ -1879,12 +1894,23 @@ function proceedPendingAction(){
 }
 
 let deleteJustDate = null;
+let deleteJustEditingExisting = false;
 function openDeleteJustModal(key){
-  if(records[key] && records[key].pendingRequest && !pendingRequestExpirado(records[key])){
-    showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
+  const rec = records[key];
+  if(rec && rec.pendingRequest && !pendingRequestExpirado(rec)){
+    if(rec.pendingRequest.editadoUmaVez){
+      showToast('Você já ajustou essa solicitação uma vez. Aguarde a resposta do administrador.', 5500);
+      return;
+    }
+    deleteJustEditingExisting = true;
+    deleteJustDate = key;
+    document.getElementById('deleteJustDateLabel').textContent = `Ajustar o pedido de exclusão de ${displayDateShort(key)} (só dá pra ajustar uma vez, enquanto ele ainda estiver pendente).`;
+    document.getElementById('deleteJustificativa').value = rec.pendingRequest.justificativa || '';
+    document.getElementById('deleteJustOverlay').classList.add('show');
     return;
   }
-  if(records[key] && records[key].pendingRequest && pendingRequestExpirado(records[key])){
+  deleteJustEditingExisting = false;
+  if(rec && rec.pendingRequest && pendingRequestExpirado(rec)){
     showToast('O pedido anterior desse dia passou de 24h sem resposta — enviando um novo pedido.', 5000);
   }
   deleteJustDate = key;
@@ -1899,9 +1925,29 @@ async function sendDeleteRequest(){
   const key = deleteJustDate;
   const justificativa = document.getElementById('deleteJustificativa').value.trim();
   if(!justificativa){ showToast('Escreva a justificativa da exclusão.'); return; }
+
+  // Ajustando um pedido já enviado (permitido só 1 vez, enquanto pendente):
+  // não cria uma solicitação nova, só atualiza a justificativa da mesma.
+  if(deleteJustEditingExisting && records[key] && records[key].pendingRequest){
+    const pr = records[key].pendingRequest;
+    const backup = {...records[key]};
+    pr.justificativa = justificativa;
+    pr.editadoUmaVez = true;
+    const saved = await saveRecords();
+    if(!saved){ records[key] = backup; showToast('Não foi possível salvar o ajuste.'); return; }
+    if(pr.solicitacaoId){
+      await updateSolicitacao(pr.solicitacaoId, { justificativa, editadoEm:new Date().toISOString() });
+    }
+    closeDeleteJustModal();
+    renderToday();
+    renderHistory();
+    showToast('Pedido de exclusão ajustado. Aguardando aprovação do administrador.', 5000);
+    return;
+  }
+
   const antigo = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false};
   const backup = records[key] ? {...records[key]} : null;
-  records[key] = { ...antigo, pendingRequest:{ tipo:'exclusao', novo:null, justificativa, criadoEm:new Date().toISOString() } };
+  records[key] = { ...antigo, pendingRequest:{ tipo:'exclusao', novo:null, justificativa, criadoEm:new Date().toISOString(), editadoUmaVez:false } };
   const saved = await saveRecords();
   if(!saved){ if(backup){records[key]=backup;}else{delete records[key];} showToast('Não foi possível enviar a solicitação.'); return; }
   const novoId = await createSolicitacao({
@@ -2001,22 +2047,48 @@ async function onSetupSave(){
 }
 
 // --- edição manual ---
+let editingPendingSolicitacao = false;
 function openEditModal(dateKey){
   const key = dateKey || todayKey();
-  if(records[key] && records[key].pendingRequest && !pendingRequestExpirado(records[key])){
-    showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
+  const rec = records[key];
+  editingPendingSolicitacao = false;
+  if(rec && rec.pendingRequest && !pendingRequestExpirado(rec)){
+    if(rec.pendingRequest.editadoUmaVez){
+      showToast('Você já ajustou essa solicitação uma vez. Aguarde a resposta do administrador.', 5500);
+      return;
+    }
+    if(!rec.pendingRequest.solicitacaoId){
+      showToast('Já existe uma solicitação pendente pra esse dia. Aguarde a aprovação do administrador.', 5000);
+      return;
+    }
+    editingPendingSolicitacao = true;
+    document.getElementById('editModalTitle').textContent = 'Ajustar solicitação pendente';
+    document.getElementById('editModalHint').textContent = 'Você já pediu um ajuste pra esse dia — dá pra corrigir os valores pedidos uma única vez, enquanto o administrador ainda não respondeu.';
+    document.getElementById('editDate').value = key;
+    const pr = rec.pendingRequest;
+    const prNovo = pr.novo || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false};
+    document.getElementById('editEntrada').value = (prNovo.entrada||'').slice(0,5);
+    document.getElementById('editAlmocoSaida').value = (prNovo.almocoSaida||'').slice(0,5);
+    document.getElementById('editAlmocoVolta').value = (prNovo.almocoVolta||'').slice(0,5);
+    document.getElementById('editSaida').value = (prNovo.saida||'').slice(0,5);
+    document.getElementById('editFalta').checked = !!prNovo.falta;
+    document.getElementById('editJustificativa').value = pr.justificativa || '';
+    toggleEditFaltaFields();
+    document.getElementById('editModalOverlay').classList.add('show');
     return;
   }
-  if(records[key] && records[key].pendingRequest && pendingRequestExpirado(records[key])){
+  document.getElementById('editModalTitle').textContent = 'Solicitar ajuste de horários';
+  document.getElementById('editModalHint').textContent = 'Isso não muda o ponto na hora — vira uma solicitação, e o administrador precisa aprovar.';
+  if(rec && rec.pendingRequest && pendingRequestExpirado(rec)){
     showToast('O pedido anterior desse dia passou de 24h sem resposta — você pode enviar um novo.', 5000);
   }
-  const rec = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
+  const recAtual = rec || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null};
   document.getElementById('editDate').value = key;
-  document.getElementById('editEntrada').value = (rec.entrada||'').slice(0,5);
-  document.getElementById('editAlmocoSaida').value = (rec.almocoSaida||'').slice(0,5);
-  document.getElementById('editAlmocoVolta').value = (rec.almocoVolta||'').slice(0,5);
-  document.getElementById('editSaida').value = (rec.saida||'').slice(0,5);
-  document.getElementById('editFalta').checked = !!rec.falta;
+  document.getElementById('editEntrada').value = (recAtual.entrada||'').slice(0,5);
+  document.getElementById('editAlmocoSaida').value = (recAtual.almocoSaida||'').slice(0,5);
+  document.getElementById('editAlmocoVolta').value = (recAtual.almocoVolta||'').slice(0,5);
+  document.getElementById('editSaida').value = (recAtual.saida||'').slice(0,5);
+  document.getElementById('editFalta').checked = !!recAtual.falta;
   document.getElementById('editJustificativa').value = '';
   toggleEditFaltaFields();
   document.getElementById('editModalOverlay').classList.add('show');
@@ -2058,14 +2130,44 @@ async function saveManualEdit(){
     novo = {falta:false};
     TIPOS.forEach(t=>{ novo[t] = vals[t] ? vals[t]+':00' : null; });
   }
+
+  const btn = document.getElementById('editSave');
+
+  // Ajustando um pedido já enviado (permitido só 1 vez, enquanto pendente):
+  // atualiza a mesma solicitação em vez de criar uma nova.
+  if(editingPendingSolicitacao && records[key] && records[key].pendingRequest){
+    const pr = records[key].pendingRequest;
+    const backup = {...records[key]};
+    pr.novo = novo;
+    pr.justificativa = justificativa;
+    pr.editadoUmaVez = true;
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+    const saved = await saveRecords();
+    if(!saved){
+      records[key] = backup;
+      btn.disabled = false;
+      btn.textContent = 'Enviar para aprovação';
+      showToast('Não foi possível salvar o ajuste.');
+      return;
+    }
+    await updateSolicitacao(pr.solicitacaoId, { novo, justificativa, editadoEm:new Date().toISOString() });
+    btn.disabled = false;
+    btn.textContent = 'Enviar para aprovação';
+    renderToday();
+    renderHistory();
+    closeEditModal();
+    showToast(`Pedido de ajuste de ${displayDateShort(key)} atualizado. Aguardando aprovação do administrador.`, 5000);
+    return;
+  }
+
   const atual = records[key] || {entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false};
   const antigo = {entrada:atual.entrada||null, almocoSaida:atual.almocoSaida||null, almocoVolta:atual.almocoVolta||null, saida:atual.saida||null, falta:!!atual.falta};
   const backup = records[key] ? {...records[key]} : null;
   // O valor batido continua igual — só grava que existe um pedido pendente
   // esperando o administrador aprovar.
-  records[key] = { ...atual, pendingRequest:{ tipo:'edicao', novo, justificativa, criadoEm:new Date().toISOString() } };
+  records[key] = { ...atual, pendingRequest:{ tipo:'edicao', novo, justificativa, criadoEm:new Date().toISOString(), editadoUmaVez:false } };
 
-  const btn = document.getElementById('editSave');
   btn.disabled = true;
   btn.textContent = 'Enviando...';
   const ok = await saveRecords();
