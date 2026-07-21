@@ -243,11 +243,10 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
 
     <div class="field-row"><label for="vaValorDia">Vale Alimentação por dia trabalhado (R$)</label><input type="number" id="vaValorDia" step="0.01" min="0"></div>
     <div class="field-row">
-      <label for="vaForma">Vale Alimentação é pago em</label>
-      <select id="vaForma">
-        <option value="cartao">Cartão benefício</option>
-        <option value="dinheiro">Dinheiro</option>
-      </select>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+        <input type="checkbox" id="vaFormaDinheiro" style="width:auto;">
+        Vale Alimentação pago em dinheiro (desmarcado = cartão benefício)
+      </label>
     </div>
 
     <div class="field-row" style="border-top:1.5px solid var(--line); padding-top:12px;">
@@ -258,13 +257,13 @@ th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercas
     </div>
     <div id="vtFields" style="display:none;">
       <div class="field-row"><label for="vtValorDia">Valor do vale transporte por dia (R$)</label><input type="number" id="vtValorDia" step="0.01" min="0"></div>
-      <div class="field-row"><label for="vtPercentual">Percentual descontado do salário (%)</label><input type="number" id="vtPercentual" step="0.1" min="0" max="100" placeholder="Ex.: 6 (padrão legal é até 6%)"></div>
+      <div class="field-row"><label for="vtPercentual">Desconto legal sobre o salário — opcional (%)</label><input type="number" id="vtPercentual" step="0.1" min="0" max="100" placeholder="Deixe em branco ou 0 se não desconta nada"></div>
+      <p class="hint-text" style="margin-top:-4px;">O valor do Vale Transporte aparece pro funcionário mesmo com esse campo em 0 — esse percentual é só um desconto opcional sobre o salário (limite legal: 6%).</p>
       <div class="field-row">
-        <label for="vtForma">Vale Transporte é pago em</label>
-        <select id="vtForma">
-          <option value="cartao">Cartão benefício</option>
-          <option value="dinheiro">Dinheiro</option>
-        </select>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="vtFormaDinheiro" style="width:auto;">
+          Vale Transporte pago em dinheiro (desmarcado = cartão benefício)
+        </label>
       </div>
     </div>
 
@@ -829,11 +828,11 @@ function openPayConfig(){
   document.getElementById('valor6h').value = dv['6']||dv[6]||0;
   document.getElementById('valor8h').value = dv['8']||dv[8]||0;
   document.getElementById('vaValorDia').value = e.va || '';
-  document.getElementById('vaForma').value = e.vaForma || 'cartao';
+  document.getElementById('vaFormaDinheiro').checked = (e.vaForma === 'dinheiro');
   document.getElementById('vtAtivoCheck').checked = !!e.vtAtivo;
   document.getElementById('vtValorDia').value = e.vtValorDia || '';
-  document.getElementById('vtPercentual').value = e.vtPercentual || '';
-  document.getElementById('vtForma').value = e.vtForma || 'cartao';
+  document.getElementById('vtPercentual').value = (e.vtPercentual===undefined || e.vtPercentual===null) ? '' : e.vtPercentual;
+  document.getElementById('vtFormaDinheiro').checked = (e.vtForma === 'dinheiro');
   toggleTipoPagamentoFields();
   document.getElementById('payConfigOverlay').classList.add('show');
 }
@@ -852,11 +851,11 @@ async function savePayConfig(){
   const fields = {
     tipoPagamento: tipo,
     va: Number(document.getElementById('vaValorDia').value) || 0,
-    vaForma: document.getElementById('vaForma').value,
+    vaForma: document.getElementById('vaFormaDinheiro').checked ? 'dinheiro' : 'cartao',
     vtAtivo,
     vtValorDia: vtAtivo ? (Number(document.getElementById('vtValorDia').value) || 0) : 0,
     vtPercentual: vtAtivo ? (Number(document.getElementById('vtPercentual').value) || 0) : 0,
-    vtForma: document.getElementById('vtForma').value,
+    vtForma: document.getElementById('vtFormaDinheiro').checked ? 'dinheiro' : 'cartao',
   };
   if(tipo === 'diarista'){
     fields.diariaValores = {

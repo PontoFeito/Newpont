@@ -2280,11 +2280,15 @@ function computePayrollBreakdown(mk){
   const out = { diasUteis, dias, faltas, salarioMes, vaMes, extraMesMins, isCLT, isDiaristaTipo };
 
   const vtAtivo = !!(employee && employee.vtAtivo);
+  const vtForma = (employee && employee.vtForma) || 'cartao';
+  out.vtForma = vtForma;
   if(vtAtivo){
     const vtValorDia = (employee && employee.vtValorDia) || 0;
     const vtPercentual = (employee && employee.vtPercentual) || 0;
     out.vtMes = vtValorDia * dias;
-    out.descontoVT = calcDescontoVT(salarioMes, out.vtMes, vtPercentual);
+    // o desconto legal é opcional (0% = não desconta nada) — o valor do
+    // vale em si aparece sempre, independente desse percentual
+    out.descontoVT = vtPercentual>0 ? calcDescontoVT(salarioMes, out.vtMes, vtPercentual) : 0;
   }else{
     out.vtMes = 0;
     out.descontoVT = 0;
@@ -2297,7 +2301,9 @@ function computePayrollBreakdown(mk){
   }else{
     out.salarioLiquido = salarioMes - out.descontoVT;
   }
-  out.totalMes = out.salarioLiquido + vaMes;
+  // Vale Transporte pago em dinheiro entra no total a receber; pago em
+  // cartão benefício é creditado à parte (só informativo aqui).
+  out.totalMes = out.salarioLiquido + vaMes + (vtAtivo && vtForma==='dinheiro' ? out.vtMes : 0);
   return out;
 }
 
@@ -2313,7 +2319,8 @@ function openPayrollSummary(){
     <div class="receipt-row"><span class="r-label">Faltas registradas</span><span class="r-value">${b.faltas}</span></div>
     <div class="receipt-row"><span class="r-label">${b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)'}</span><span class="r-value">${formatBRL(b.salarioMes)}</span></div>
     ${b.isCLT ? `<div class="receipt-row"><span class="r-label">INSS (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.inss)}</span></div>` : ''}
-    ${b.descontoVT>0 ? `<div class="receipt-row"><span class="r-label">Vale Transporte (desconto${employee && employee.vtForma==='dinheiro' ? ', dinheiro' : ', cartão benefício'})</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.descontoVT)}</span></div>` : ''}
+    ${b.vtMes>0 ? `<div class="receipt-row"><span class="r-label">Vale Transporte${b.vtForma==='dinheiro' ? ' (dinheiro)' : ' (cartão benefício)'}</span><span class="r-value">${formatBRL(b.vtMes)}</span></div>` : ''}
+    ${b.descontoVT>0 ? `<div class="receipt-row"><span class="r-label">Desconto legal do Vale Transporte</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.descontoVT)}</span></div>` : ''}
     <div class="receipt-row"><span class="r-label">Líquido</span><span class="r-value">${formatBRL(b.salarioLiquido)}</span></div>
     <div class="receipt-row"><span class="r-label">Vale Alimentação${employee && employee.vaForma==='dinheiro' ? ' (dinheiro)' : ' (cartão benefício)'}</span><span class="r-value">${formatBRL(b.vaMes)}</span></div>
     <div class="receipt-row total"><span class="r-label">Total do mês (a receber)</span><span class="r-value">${formatBRL(b.totalMes)}</span></div>
@@ -2497,9 +2504,10 @@ function payrollBreakdownPairs(mk){
     [b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)', formatBRL(b.salarioMes)],
   ];
   if(b.isCLT) pairs.push(['INSS (desconto)', '-' + formatBRL(b.inss)]);
-  if(b.descontoVT>0) pairs.push(['Vale Transporte (desconto)', '-' + formatBRL(b.descontoVT)]);
+  if(b.vtMes>0) pairs.push([`Vale Transporte (${b.vtForma==='dinheiro'?'dinheiro':'cartão benefício'})`, formatBRL(b.vtMes)]);
+  if(b.descontoVT>0) pairs.push(['Desconto legal do Vale Transporte', '-' + formatBRL(b.descontoVT)]);
   pairs.push(['Líquido', formatBRL(b.salarioLiquido)]);
-  pairs.push(['Vale Alimentação', formatBRL(b.vaMes)]);
+  pairs.push([`Vale Alimentação (${employee.vaForma==='dinheiro'?'dinheiro':'cartão benefício'})`, formatBRL(b.vaMes)]);
   pairs.push(['Total do mês (a receber)', formatBRL(b.totalMes)]);
   if(b.isCLT) pairs.push(['FGTS depositado (informativo)', formatBRL(b.fgts)]);
   return pairs;
