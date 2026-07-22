@@ -925,12 +925,16 @@ const auth = firebase.auth();
 const STORAGE_KEY = 'ponto-records';
 const SECURITY_KEY = 'ponto-security';
 const PROFILE_KEY = 'ponto-perfil';
+const EXTRAS_PAGOS_KEY = 'ponto-extras-pagos';
 const TIPOS = ['entrada','almocoSaida','almocoVolta','saida'];
 const LABELS = {entrada:'Entrada', almocoSaida:'Saída Almoço', almocoVolta:'Volta Almoço', saida:'Saída'};
 let records = {};
 let security = null; // {passwordHash, question, answerHash}
 let profile = null; // {nome}
 let employee = null; // {nome, identifier, status:'ativo'|'demitido', demitidoEm, tipoPagamento:'estagiario'|'clt'|'diarista', salario, va, vtAtivo, vtValorDia, vtPercentual, diariaValores:{4,6,8}}
+// Lista de horas extras pagas em dinheiro (em vez de viradas em folga) —
+// criada pelo administrador. [{id, mes:'YYYY-MM', horas, valor, motivo, quando}]
+let extrasPagos = [];
 let viewMonth = null; // 'YYYY-MM'
 let pendingAction = null; // 'edit' | 'changePassword'
 let pendingEditDate = null;
@@ -1006,6 +1010,11 @@ function calcDiaria(mins){
 function calcTotal(rec, key){
   if(!rec) return null;
   if(rec.falta) return {falta:true, text:'Falta', mins:0, complete:true, extraMins:0, normalMins:0};
+  // Abono (dia dispensado com direito a pagamento) e Folga (dia de folga
+  // usando saldo de hora extra) só são criados pelo administrador — contam
+  // como dia pago, mas não têm horário batido nem geram hora extra.
+  if(rec.abono) return {abono:true, text:'Abono', mins:0, complete:true, extraMins:0, normalMins:0};
+  if(rec.folga) return {folga:true, text:'Folga', mins:0, complete:true, extraMins:0, normalMins:0};
   // Sábado e domingo não são dias úteis normais — qualquer coisa trabalhada
   // neles conta inteira como hora extra, mesmo que não passe de 6h.
   let fimDeSemana = false;
@@ -1458,6 +1467,16 @@ async function loadProfile(){
     profile = null;
   }
 }
+// O administrador quem cria essas entradas (via admin.html); o app do
+// funcionário só lê, pra mostrar no fechamento do mês.
+async function loadExtrasPagos(){
+  try{
+    const res = await storageGet(EXTRAS_PAGOS_KEY);
+    extrasPagos = res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){
+    extrasPagos = [];
+  }
+}
 async function saveProfile(p){
   const ok = await storageSet(PROFILE_KEY, JSON.stringify(p));
   if(ok){
@@ -1758,7 +1777,7 @@ function renderToday(){
     }
   });
   const tot = calcTotal(rec, todayKey());
-  let totalTexto = tot ? (tot.falta ? 'Falta registrada' : tot.text + (tot.complete?'':' (parcial)')) : '—';
+  let totalTexto = tot ? (tot.falta ? 'Falta registrada' : (tot.abono ? 'Abono' : (tot.folga ? 'Folga' : tot.text + (tot.complete?'':' (parcial)')))) : '—';
   if(rec.pendingRequest) totalTexto += ' · ⏳ ajuste pendente de aprovação';
   document.getElementById('totalHoje').textContent = totalTexto;
   const extraRow = document.getElementById('extraRow');
@@ -2285,6 +2304,19 @@ function calcDescontoVT(salarioBase, valorMesVT, percentual){
 function diasTrabalhadosNoMes(mk){
   return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].entrada && !records[k].falta).length;
 }
+// Dias "pagos" no mês = dias fisicamente trabalhados + abonos + folgas.
+// Usado só pra calcular o salário proporcional (CLT/estagiário) — abono e
+// folga não geram Vale Alimentação/Transporte, porque a pessoa não foi
+// trabalhar fisicamente naquele dia.
+function diasAbonoNoMes(mk){
+  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].abono).length;
+}
+function diasFolgaNoMes(mk){
+  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].folga).length;
+}
+function diasPagosNoMes(mk){
+  return diasTrabalhadosNoMes(mk) + diasAbonoNoMes(mk) + diasFolgaNoMes(mk);
+}
 function diasUteisNoMes(mk){
   const [y,m] = mk.split('-').map(Number);
   const diasNoMes = new Date(y, m, 0).getDate();
@@ -2301,7 +2333,10 @@ function faltasNoMes(mk){
 
 function computePayrollBreakdown(mk){
   const diasUteis = diasUteisNoMes(mk);
-  const dias = diasTrabalhadosNoMes(mk);
+  const diasFisicos = diasTrabalhadosNoMes(mk); // dias fisicamente trabalhados — usados pra VA/VT
+  const diasAbono = diasAbonoNoMes(mk);
+  const diasFolga = diasFolgaNoMes(mk);
+  const diasPagos = diasFisicos + diasAbono + diasFolga; // usados pra proporção do salário
   const faltas = faltasNoMes(mk);
   const tipo = employee ? employee.tipoPagamento : null;
   const isCLT = tipo === 'clt' || tipo === 'mensalista'; // 'mensalista' é o nome antigo do CLT
@@ -2313,6 +2348,10 @@ function computePayrollBreakdown(mk){
     const dv = (employee && employee.diariaValores) || {};
     Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
       const rec = records[k];
+      // Abono/folga de um diarista: o administrador escolhe manualmente um
+      // valor (não tem horário batido pra calcular sozinho).
+      if(rec.abono){ salarioMes += Number(rec.abono.valorDia || 0); return; }
+      if(rec.folga){ salarioMes += Number(rec.folga.valorDia || 0); return; }
       const t = calcTotal(rec, k);
       if(t && !t.falta && rec.entrada && rec.saida){
         const horas = t.mins/60;
@@ -2323,12 +2362,14 @@ function computePayrollBreakdown(mk){
   }else{
     const salario = (employee && employee.salario) || 0;
     const diaValor = diasUteis>0 ? salario/diasUteis : 0;
-    salarioMes = diaValor * dias;
-    if(dias >= diasUteis) salarioMes = salario;
+    salarioMes = diaValor * diasPagos;
+    if(diasPagos >= diasUteis) salarioMes = salario;
   }
 
+  // Vale Alimentação/Transporte só nos dias fisicamente trabalhados —
+  // abono e folga não geram esses benefícios.
   const va = (employee && employee.va) || 0;
-  const vaMes = va * dias;
+  const vaMes = va * diasFisicos;
 
   let extraMesMins = 0;
   Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
@@ -2336,7 +2377,13 @@ function computePayrollBreakdown(mk){
     if(t && !t.falta) extraMesMins += t.extraMins;
   });
 
-  const out = { diasUteis, dias, faltas, salarioMes, vaMes, extraMesMins, isCLT, isDiaristaTipo };
+  // Horas extras que o administrador marcou como "pagas em dinheiro" (em
+  // vez de viradas em folga) neste mês.
+  const extrasPagasDoMes = extrasPagos.filter(x=>x.mes===mk);
+  const extrasPagasMins = extrasPagasDoMes.reduce((s,x)=>s+(Number(x.horas)||0)*60, 0);
+  const extrasPagasValor = extrasPagasDoMes.reduce((s,x)=>s+(Number(x.valor)||0), 0);
+
+  const out = { diasUteis, dias: diasFisicos, diasFisicos, diasAbono, diasFolga, diasPagos, faltas, salarioMes, vaMes, extraMesMins, isCLT, isDiaristaTipo, extrasPagasMins, extrasPagasValor, extrasPagasDoMes };
 
   const vtAtivo = !!(employee && employee.vtAtivo);
   const vtForma = (employee && employee.vtForma) || 'cartao';
@@ -2344,7 +2391,7 @@ function computePayrollBreakdown(mk){
   if(vtAtivo){
     const vtValorDia = (employee && employee.vtValorDia) || 0;
     const vtPercentual = (employee && employee.vtPercentual) || 0;
-    out.vtMes = vtValorDia * dias;
+    out.vtMes = vtValorDia * diasFisicos;
     // o desconto legal é opcional (0% = não desconta nada) — o valor do
     // vale em si aparece sempre, independente desse percentual
     out.descontoVT = vtPercentual>0 ? calcDescontoVT(salarioMes, out.vtMes, vtPercentual) : 0;
@@ -2362,7 +2409,7 @@ function computePayrollBreakdown(mk){
   }
   // Vale Transporte pago em dinheiro entra no total a receber; pago em
   // cartão benefício é creditado à parte (só informativo aqui).
-  out.totalMes = out.salarioLiquido + vaMes + (vtAtivo && vtForma==='dinheiro' ? out.vtMes : 0);
+  out.totalMes = out.salarioLiquido + vaMes + extrasPagasValor + (vtAtivo && vtForma==='dinheiro' ? out.vtMes : 0);
   return out;
 }
 
@@ -2374,7 +2421,9 @@ function openPayrollSummary(){
   document.getElementById('payrollTitle').textContent = `Fechamento — ${monthLabelOf(mk)}`;
   document.getElementById('payrollReceipt').innerHTML = `
     <div class="receipt-row"><span class="r-label">Dias úteis no mês (seg. a sex.)</span><span class="r-value">${b.diasUteis}</span></div>
-    <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${b.dias} de ${b.diasUteis}</span></div>
+    <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${b.diasFisicos} de ${b.diasUteis}</span></div>
+    ${b.diasAbono>0 ? `<div class="receipt-row"><span class="r-label">Dias de abono</span><span class="r-value">${b.diasAbono}</span></div>` : ''}
+    ${b.diasFolga>0 ? `<div class="receipt-row"><span class="r-label">Dias de folga (hora extra)</span><span class="r-value">${b.diasFolga}</span></div>` : ''}
     <div class="receipt-row"><span class="r-label">Faltas registradas</span><span class="r-value">${b.faltas}</span></div>
     <div class="receipt-row"><span class="r-label">${b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)'}</span><span class="r-value">${formatBRL(b.salarioMes)}</span></div>
     ${b.isCLT ? `<div class="receipt-row"><span class="r-label">INSS (desconto)</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.inss)}</span></div>` : ''}
@@ -2382,6 +2431,7 @@ function openPayrollSummary(){
     ${b.descontoVT>0 ? `<div class="receipt-row"><span class="r-label">Desconto legal do Vale Transporte</span><span class="r-value" style="color:var(--stamp-red);">-${formatBRL(b.descontoVT)}</span></div>` : ''}
     <div class="receipt-row"><span class="r-label">Líquido</span><span class="r-value">${formatBRL(b.salarioLiquido)}</span></div>
     <div class="receipt-row"><span class="r-label">Vale Alimentação${employee && employee.vaForma==='dinheiro' ? ' (dinheiro)' : ' (cartão benefício)'}</span><span class="r-value">${formatBRL(b.vaMes)}</span></div>
+    ${b.extrasPagasValor>0 ? `<div class="receipt-row"><span class="r-label">Hora extra paga em dinheiro (${formatMinutes(b.extrasPagasMins)})</span><span class="r-value">${formatBRL(b.extrasPagasValor)}</span></div>` : ''}
     <div class="receipt-row total"><span class="r-label">Total do mês (a receber)</span><span class="r-value">${formatBRL(b.totalMes)}</span></div>
     ${b.isCLT ? `<div class="receipt-row"><span class="r-label">FGTS depositado (informativo)</span><span class="r-value">${formatBRL(b.fgts)}</span></div>` : ''}
     ${b.extraMesMins>0 ? `<div class="receipt-row"><span class="r-label">Hora extra no mês</span><span class="r-value" style="color:var(--stamp-red);">${formatMinutes(b.extraMesMins)}</span></div>` : ''}
@@ -2402,6 +2452,15 @@ function maybeAutoShowPayroll(){
       openPayrollSummary();
     }
   }
+}
+
+// Texto/cor pra dias especiais (falta/abono/folga) — usado no histórico,
+// na tela cheia e nas exportações, pra não repetir a mesma lógica.
+function specialDayBadge(rec, tot){
+  if(tot && tot.falta) return {label:'FALTA', color:'var(--stamp-red)'};
+  if(tot && tot.abono) return {label:'ABONO' + (rec.abono && rec.abono.motivo ? ` — ${rec.abono.motivo}` : ''), color:'#1a6b3c'};
+  if(tot && tot.folga) return {label:'FOLGA' + (rec.folga && rec.folga.motivo ? ` — ${rec.folga.motivo}` : ''), color:'#8a5a00'};
+  return null;
 }
 
 // --- histórico por mês ---
@@ -2428,10 +2487,11 @@ function renderHistory(){
   tbody.innerHTML = keys.map(key=>{
     const rec = records[key];
     const tot = calcTotal(rec, key);
-    if(tot && tot.falta){
+    const badge = specialDayBadge(rec, tot);
+    if(badge){
       return `<tr>
         <td>${displayDateShort(key)}</td>
-        <td colspan="4" style="text-align:center;color:var(--stamp-red);font-weight:700;letter-spacing:1px;">FALTA${rec.pendingRequest?' ⏳':''}</td>
+        <td colspan="4" style="text-align:center;color:${badge.color};font-weight:700;letter-spacing:1px;">${esc(badge.label)}${rec.pendingRequest?' ⏳':''}</td>
         <td>—</td>
         <td>—</td>
         <td>
@@ -2493,9 +2553,10 @@ function renderFullscreen(){
   body.innerHTML = keys.map(key=>{
     const rec = records[key];
     const tot = calcTotal(rec, key);
-    if(tot && tot.falta){
+    const badge = specialDayBadge(rec, tot);
+    if(badge){
       return `<div class="fs-card">
-        <div class="fs-card-date">${displayDate(key)} <span class="fs-card-falta">FALTA</span></div>
+        <div class="fs-card-date">${displayDate(key)} <span class="fs-card-falta" style="color:${badge.color};">${esc(badge.label)}</span></div>
       </div>`;
     }
     return `<div class="fs-card">
@@ -2549,7 +2610,7 @@ function buildReportRows(){
   return keys.map(key=>{
     const rec = records[key];
     const tot = calcTotal(rec, key);
-    return {key, rec, tot, isFalta: !!(tot && tot.falta)};
+    return {key, rec, tot, isFalta: !!(tot && tot.falta), badge: specialDayBadge(rec, tot)};
   });
 }
 
@@ -2558,15 +2619,18 @@ function payrollBreakdownPairs(mk){
   const b = computePayrollBreakdown(mk);
   const pairs = [
     ['Dias úteis no mês', String(b.diasUteis)],
-    ['Dias trabalhados', `${b.dias} de ${b.diasUteis}`],
-    ['Faltas registradas', String(b.faltas)],
-    [b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)', formatBRL(b.salarioMes)],
+    ['Dias trabalhados', `${b.diasFisicos} de ${b.diasUteis}`],
   ];
+  if(b.diasAbono>0) pairs.push(['Dias de abono', String(b.diasAbono)]);
+  if(b.diasFolga>0) pairs.push(['Dias de folga (hora extra)', String(b.diasFolga)]);
+  pairs.push(['Faltas registradas', String(b.faltas)]);
+  pairs.push([b.isDiaristaTipo ? 'Total das diárias' : 'Salário bruto (proporcional)', formatBRL(b.salarioMes)]);
   if(b.isCLT) pairs.push(['INSS (desconto)', '-' + formatBRL(b.inss)]);
   if(b.vtMes>0) pairs.push([`Vale Transporte (${b.vtForma==='dinheiro'?'dinheiro':'cartão benefício'})`, formatBRL(b.vtMes)]);
   if(b.descontoVT>0) pairs.push(['Desconto legal do Vale Transporte', '-' + formatBRL(b.descontoVT)]);
   pairs.push(['Líquido', formatBRL(b.salarioLiquido)]);
   pairs.push([`Vale Alimentação (${employee.vaForma==='dinheiro'?'dinheiro':'cartão benefício'})`, formatBRL(b.vaMes)]);
+  if(b.extrasPagasValor>0) pairs.push([`Hora extra paga em dinheiro (${formatMinutes(b.extrasPagasMins)})`, formatBRL(b.extrasPagasValor)]);
   pairs.push(['Total do mês (a receber)', formatBRL(b.totalMes)]);
   if(b.isCLT) pairs.push(['FGTS depositado (informativo)', formatBRL(b.fgts)]);
   return pairs;
@@ -2579,9 +2643,9 @@ async function exportA4(){
   const nome = profile && profile.nome ? profile.nome : 'Não informado';
   const win = window.open('', '_blank');
   if(!win){ showToast('Permita pop-ups no navegador para exportar em A4.', 4000); return; }
-  const bodyRows = rows.map(({key, rec, tot, isFalta})=>{
-    if(isFalta){
-      return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">FALTA</td><td>—</td><td>—</td></tr>`;
+  const bodyRows = rows.map(({key, rec, tot, badge})=>{
+    if(badge){
+      return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">${esc(badge.label)}</td><td>—</td><td>—</td></tr>`;
     }
     return `<tr>
       <td>${displayDateShort(key)}</td>
@@ -2632,9 +2696,9 @@ async function exportExcel(){
   if(rows.length===0){ showToast('Não há registros para exportar.'); return; }
   const includePayroll = employee ? await askConfirm(`Incluir os valores de pagamento de ${monthLabelOf(viewMonth)} (salário, descontos) neste arquivo?`) : false;
   const nome = profile && profile.nome ? profile.nome : 'Não informado';
-  const bodyRows = rows.map(({key, rec, tot, isFalta})=>{
-    if(isFalta){
-      return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">FALTA</td><td></td><td></td></tr>`;
+  const bodyRows = rows.map(({key, rec, tot, badge})=>{
+    if(badge){
+      return `<tr><td>${esc(displayDateShort(key))}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">${esc(safeCell(badge.label))}</td><td></td><td></td></tr>`;
     }
     return `<tr>
       <td>${displayDateShort(key)}</td>
@@ -2741,12 +2805,13 @@ async function importCSVFile(file){
 function exportCSV(){
   const keys = Object.keys(records).sort();
   if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
-  let csv = 'Funcionario;' + safeCell(profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
+  let csv = 'Funcionario;' + safeCell(profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Observacao\n';
   keys.forEach(key=>{
     const rec = records[key];
     const tot = calcTotal(rec, key);
-    if(tot && tot.falta){
-      csv += [displayDateShort(key), '', '', '', '', '', '', 'SIM'].join(';') + '\n';
+    const badge = specialDayBadge(rec, tot);
+    if(badge){
+      csv += [displayDateShort(key), '', '', '', '', '', '', safeCell(badge.label)].join(';') + '\n';
     }else{
       csv += [displayDateShort(key), rec.entrada||'', rec.almocoSaida||'', rec.almocoVolta||'', rec.saida||'', tot?tot.text:'', tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : '', ''].join(';') + '\n';
     }
@@ -2958,7 +3023,7 @@ async function startApp(){
 
   // Fase 2: busca a versão mais atual no servidor (em paralelo, não em
   // sequência) e atualiza a tela de novo se algo tiver mudado.
-  await Promise.all([loadRecords(), loadSecurity(), loadProfile()]);
+  await Promise.all([loadRecords(), loadSecurity(), loadProfile(), loadExtrasPagos()]);
   const authEmailAtual = auth.currentUser ? auth.currentUser.email : '';
   await ensureEmployeeDoc(profile ? profile.nome : '', authEmailAtual);
   await checkAvisosRecusados();

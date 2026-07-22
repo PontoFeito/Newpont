@@ -227,6 +227,17 @@ tbody tr:hover{background:var(--accent-tint);}
         <button class="btn outline small" id="configPagamentoBtn">Configurar pagamento / diária</button>
       </div>
 
+      <div class="card" style="border-color:#8a5a00; margin-bottom:16px;">
+        <h3 style="font-family:'Oswald',sans-serif; font-size:15px; text-transform:uppercase; margin:0 0 6px;">Banco de horas extras</h3>
+        <p id="saldoExtraLabel" style="font-family:'Space Mono',monospace; font-size:14px; margin:0 0 12px;">—</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn outline small" id="marcarAbonoBtn">🗓️ Marcar abono</button>
+          <button class="btn outline small" id="converterFolgaBtn">🔁 Usar em folga</button>
+          <button class="btn outline small" id="pagarDinheiroBtn">💵 Pagar em dinheiro</button>
+        </div>
+        <div id="historicoAjustesWrap" style="margin-top:12px; font-size:12.5px;"></div>
+      </div>
+
       <div class="month-nav">
         <button id="prevMonthBtn">‹</button>
         <div id="monthLabel" style="font-family:'Space Mono',monospace;">—</div>
@@ -238,6 +249,69 @@ tbody tr:hover{background:var(--accent-tint);}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- modal: marcar abono -->
+<div class="modal-overlay" id="abonoOverlay">
+  <div class="modal">
+    <h3>Marcar abono</h3>
+    <p class="hint-text">Dia dispensado com direito a pagamento — conta como dia trabalhado no salário, mas não gera Vale Alimentação nem Vale Transporte.</p>
+    <div class="field-row"><label for="abonoData">Data</label><input type="date" id="abonoData"></div>
+    <div class="field-row" id="abonoValorRow" style="display:none;">
+      <label for="abonoValorSelect">Valor do dia (diarista)</label>
+      <select id="abonoValorSelect">
+        <option value="">Sem valor (não remunerado)</option>
+        <option value="4">Diária de 4h</option>
+        <option value="6">Diária de 6h</option>
+        <option value="8">Diária de 8h</option>
+      </select>
+    </div>
+    <div class="field-row"><label for="abonoMotivo">Motivo (referência)</label><textarea id="abonoMotivo" rows="2" placeholder="Ex.: atestado médico, licença, viagem a trabalho..."></textarea></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="abonoCancel">Cancelar</button>
+      <button class="btn" id="abonoSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: converter hora extra em folga -->
+<div class="modal-overlay" id="folgaOverlay">
+  <div class="modal">
+    <h3>Usar hora extra como folga</h3>
+    <p class="hint-text">O dia escolhido fica marcado como folga — conta como dia trabalhado no salário, mas não gera Vale Alimentação nem Vale Transporte. As horas usadas saem do saldo de hora extra.</p>
+    <div class="field-row"><label for="folgaData">Data da folga</label><input type="date" id="folgaData"></div>
+    <div class="field-row"><label for="folgaHoras">Horas de saldo a usar</label><input type="number" id="folgaHoras" step="0.5" min="0"></div>
+    <div class="field-row" id="folgaValorRow" style="display:none;">
+      <label for="folgaValorSelect">Valor do dia (diarista)</label>
+      <select id="folgaValorSelect">
+        <option value="">Sem valor (não remunerado)</option>
+        <option value="4">Diária de 4h</option>
+        <option value="6">Diária de 6h</option>
+        <option value="8">Diária de 8h</option>
+      </select>
+    </div>
+    <div class="field-row"><label for="folgaMotivo">Motivo (referência)</label><textarea id="folgaMotivo" rows="2" placeholder="Ex.: compensação das horas extras de tal semana..."></textarea></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="folgaCancel">Cancelar</button>
+      <button class="btn" id="folgaSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: pagar hora extra em dinheiro -->
+<div class="modal-overlay" id="dinheiroOverlay">
+  <div class="modal">
+    <h3>Pagar hora extra em dinheiro</h3>
+    <p class="hint-text">Registra que uma parte do saldo de hora extra foi paga em dinheiro (em vez de virar folga). Aparece no fechamento do mês do funcionário como um valor a receber.</p>
+    <div class="field-row"><label for="dinheiroHoras">Horas de saldo a pagar</label><input type="number" id="dinheiroHoras" step="0.5" min="0"></div>
+    <div class="field-row"><label for="dinheiroValor">Valor pago (R$)</label><input type="number" id="dinheiroValor" step="0.01" min="0"></div>
+    <div class="field-row"><label for="dinheiroMes">Referente ao mês</label><input type="month" id="dinheiroMes"></div>
+    <div class="field-row"><label for="dinheiroMotivo">Motivo (referência)</label><textarea id="dinheiroMotivo" rows="2" placeholder="Ex.: horas extras de outubro pagas à parte..."></textarea></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="dinheiroCancel">Cancelar</button>
+      <button class="btn" id="dinheiroSave">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- modal: configurar pagamento -->
 <div class="modal-overlay" id="payConfigOverlay">
@@ -751,7 +825,7 @@ async function openDetail(uid){
   document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span> · ${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}`;
   document.getElementById('detailContaInfo').innerHTML = `Identificação: ${esc(e.identifier||'—')}<br>UID: ${esc(e.uid)}`;
   viewMonth = new Date().toISOString().slice(0,7);
-  await renderMonth();
+  await Promise.all([renderMonth(), renderSaldoExtra()]);
 }
 function backToList(){
   document.getElementById('detailCard').classList.add('hidden');
@@ -779,6 +853,193 @@ async function fetchRecords(uid){
   const raw = data.fields && data.fields.value && data.fields.value.stringValue;
   try{ return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; }
 }
+// Grava de volta o objeto inteiro de pontos batidos de um funcionário —
+// usado pra marcar abono/folga num dia específico.
+async function writeUserAppdata(uid, key, value){
+  const token = await authToken();
+  const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${key}`;
+  const body = { fields: { value: { stringValue: value }, updatedAt: { timestampValue: new Date().toISOString() } } };
+  const res = await fetch(url, { method:'PATCH', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  return res.ok;
+}
+async function fetchExtrasPagos(uid){
+  const token = await authToken();
+  const res = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-extras-pagos`, { headers:{ Authorization:`Bearer ${token}` } });
+  if(res.status === 404) return [];
+  if(!res.ok) return [];
+  const data = await res.json();
+  const raw = data.fields && data.fields.value && data.fields.value.stringValue;
+  try{ return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
+}
+// Calcula, a partir dos pontos batidos, quanto de hora extra ainda não foi
+// usado (nem virado folga, nem pago em dinheiro) — mesma lógica de fim de
+// semana e diarista do app do funcionário, simplificada aqui.
+function calcExtraMinsDoRegistro(rec, key){
+  if(!rec || rec.falta || rec.abono || rec.folga) return 0;
+  let fimDeSemana = false;
+  if(key){
+    const [y,m,d] = key.split('-').map(Number);
+    const dow = new Date(y, m-1, d).getDay();
+    fimDeSemana = (dow===0 || dow===6);
+  }
+  if(rec.diarista){
+    const e=timeToMinutes(rec.entrada), s=timeToMinutes(rec.saida);
+    if(e===null||s===null) return 0;
+    const mins = Math.max(0, s-e);
+    return fimDeSemana ? mins : 0;
+  }
+  const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
+  let mins = 0;
+  if(e!==null && as!==null) mins += (as-e);
+  if(av!==null && s!==null) mins += (s-av);
+  if(mins<=0) return 0;
+  return fimDeSemana ? mins : (mins > 6*60 ? mins - 6*60 : 0);
+}
+async function calcSaldoHoraExtra(uid){
+  const [records, extras] = await Promise.all([fetchRecords(uid), fetchExtrasPagos(uid)]);
+  let totalExtraMins = 0;
+  Object.keys(records).forEach(k=>{ totalExtraMins += calcExtraMinsDoRegistro(records[k], k); });
+  let usadoMins = 0;
+  Object.keys(records).forEach(k=>{
+    const rec = records[k];
+    if(rec.folga && rec.folga.horasConvertidas) usadoMins += Number(rec.folga.horasConvertidas)*60;
+  });
+  extras.forEach(x=>{ usadoMins += (Number(x.horas)||0)*60; });
+  return { saldoMins: totalExtraMins - usadoMins, totalExtraMins, usadoMins, records, extras };
+}
+
+// --- banco de horas extras: abono, folga, pagamento em dinheiro ---
+async function renderSaldoExtra(){
+  const label = document.getElementById('saldoExtraLabel');
+  const wrap = document.getElementById('historicoAjustesWrap');
+  label.textContent = 'Calculando saldo…';
+  wrap.innerHTML = '';
+  const { saldoMins, records, extras } = await calcSaldoHoraExtra(currentDetailUid);
+  label.innerHTML = `Saldo disponível: <b>${formatMinutes(Math.max(0,saldoMins))}</b>` + (saldoMins<0 ? ` <span style="color:var(--stamp-red);">(negativo: ${formatMinutes(-saldoMins)})</span>` : '');
+
+  const itens = [];
+  Object.keys(records).filter(k=>records[k].abono).forEach(k=>{
+    itens.push({data:k, tipo:'Abono', motivo:records[k].abono.motivo||''});
+  });
+  Object.keys(records).filter(k=>records[k].folga).forEach(k=>{
+    itens.push({data:k, tipo:`Folga (${records[k].folga.horasConvertidas||0}h)`, motivo:records[k].folga.motivo||''});
+  });
+  extras.forEach(x=>{
+    itens.push({data:x.quando ? x.quando.slice(0,10) : '', tipo:`Pago em dinheiro (${x.horas}h, ${formatBRL(Number(x.valor)||0)})`, motivo:x.motivo||''});
+  });
+  itens.sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+  if(itens.length===0){
+    wrap.innerHTML = '<p style="color:var(--muted);">Nenhum abono, folga ou pagamento registrado ainda.</p>';
+    return;
+  }
+  wrap.innerHTML = '<p style="font-weight:bold; margin-bottom:6px;">Histórico:</p>' + itens.map(it=>
+    `<div style="border-bottom:1px solid var(--line); padding:6px 0;">
+      <div><b>${esc((it.data||'').split('-').reverse().join('/'))}</b> · ${esc(it.tipo)}</div>
+      ${it.motivo ? `<div style="color:var(--muted);">Motivo: ${esc(it.motivo)}</div>` : ''}
+    </div>`
+  ).join('');
+}
+function formatBRL(n){ return (Number(n)||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
+
+function openAbonoModal(){
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  document.getElementById('abonoData').value = '';
+  document.getElementById('abonoMotivo').value = '';
+  document.getElementById('abonoValorSelect').value = '';
+  document.getElementById('abonoValorRow').style.display = e && e.tipoPagamento==='diarista' ? 'block' : 'none';
+  document.getElementById('abonoOverlay').classList.add('show');
+}
+async function saveAbono(){
+  const data = document.getElementById('abonoData').value;
+  const motivo = document.getElementById('abonoMotivo').value.trim();
+  const valorTier = document.getElementById('abonoValorSelect').value;
+  if(!data){ showToast('Escolha uma data.'); return; }
+  if(!motivo){ showToast('Informe o motivo, pra referência futura.'); return; }
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  const records = await fetchRecords(currentDetailUid);
+  const existente = records[data];
+  if(existente && (existente.entrada || existente.falta || existente.folga)){
+    if(!confirm('Esse dia já tem batida, falta ou folga registrada. Substituir por um abono?')) return;
+  }
+  const abono = { motivo, criadoEm: new Date().toISOString() };
+  if(e && e.tipoPagamento==='diarista' && valorTier){
+    abono.valorDia = Number((e.diariaValores && e.diariaValores[valorTier]) || 0);
+  }
+  records[data] = { entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false, abono };
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast('Abono registrado.');
+    document.getElementById('abonoOverlay').classList.remove('show');
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível salvar.');
+}
+
+function openFolgaModal(){
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  document.getElementById('folgaData').value = '';
+  document.getElementById('folgaHoras').value = '';
+  document.getElementById('folgaMotivo').value = '';
+  document.getElementById('folgaValorSelect').value = '';
+  document.getElementById('folgaValorRow').style.display = e && e.tipoPagamento==='diarista' ? 'block' : 'none';
+  document.getElementById('folgaOverlay').classList.add('show');
+}
+async function saveFolga(){
+  const data = document.getElementById('folgaData').value;
+  const horas = Number(document.getElementById('folgaHoras').value);
+  const motivo = document.getElementById('folgaMotivo').value.trim();
+  const valorTier = document.getElementById('folgaValorSelect').value;
+  if(!data){ showToast('Escolha uma data.'); return; }
+  if(!horas || horas<=0){ showToast('Informe quantas horas do saldo serão usadas.'); return; }
+  if(!motivo){ showToast('Informe o motivo, pra referência futura.'); return; }
+  const { saldoMins, records } = await calcSaldoHoraExtra(currentDetailUid);
+  if(horas*60 > saldoMins){
+    if(!confirm(`O saldo disponível é de ${formatMinutes(Math.max(0,saldoMins))}, menor que as ${horas}h pedidas. Continuar mesmo assim (o saldo ficará negativo)?`)) return;
+  }
+  const existente = records[data];
+  if(existente && (existente.entrada || existente.falta || existente.abono)){
+    if(!confirm('Esse dia já tem batida, falta ou abono registrado. Substituir por uma folga?')) return;
+  }
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  const folga = { motivo, horasConvertidas: horas, criadoEm: new Date().toISOString() };
+  if(e && e.tipoPagamento==='diarista' && valorTier){
+    folga.valorDia = Number((e.diariaValores && e.diariaValores[valorTier]) || 0);
+  }
+  records[data] = { entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false, folga };
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast('Folga registrada.');
+    document.getElementById('folgaOverlay').classList.remove('show');
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível salvar.');
+}
+
+function openDinheiroModal(){
+  document.getElementById('dinheiroHoras').value = '';
+  document.getElementById('dinheiroValor').value = '';
+  document.getElementById('dinheiroMotivo').value = '';
+  document.getElementById('dinheiroMes').value = new Date().toISOString().slice(0,7);
+  document.getElementById('dinheiroOverlay').classList.add('show');
+}
+async function saveDinheiro(){
+  const horas = Number(document.getElementById('dinheiroHoras').value);
+  const valor = Number(document.getElementById('dinheiroValor').value);
+  const mes = document.getElementById('dinheiroMes').value;
+  const motivo = document.getElementById('dinheiroMotivo').value.trim();
+  if(!horas || horas<=0){ showToast('Informe quantas horas do saldo serão pagas.'); return; }
+  if(!mes){ showToast('Escolha a qual mês isso se refere.'); return; }
+  if(!motivo){ showToast('Informe o motivo, pra referência futura.'); return; }
+  const { saldoMins, extras } = await calcSaldoHoraExtra(currentDetailUid);
+  if(horas*60 > saldoMins){
+    if(!confirm(`O saldo disponível é de ${formatMinutes(Math.max(0,saldoMins))}, menor que as ${horas}h pedidas. Continuar mesmo assim (o saldo ficará negativo)?`)) return;
+  }
+  extras.push({ id: 'x'+Date.now(), mes, horas, valor: valor||0, motivo, quando: new Date().toISOString() });
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-extras-pagos', JSON.stringify(extras));
+  if(ok){
+    showToast('Pagamento registrado.');
+    document.getElementById('dinheiroOverlay').classList.remove('show');
+    await renderSaldoExtra();
+  }else showToast('Não foi possível salvar.');
+}
 async function renderMonth(){
   document.getElementById('monthLabel').textContent = monthLabelOf(viewMonth);
   const wrap = document.getElementById('monthTableWrap');
@@ -790,7 +1051,9 @@ async function renderMonth(){
   const linhas = dias.map(dateKey=>{
     const rec = records[dateKey];
     let mins = 0, texto='';
-    if(rec.falta){ texto = 'Falta'; }
+    if(rec.falta){ texto = 'FALTA'; }
+    else if(rec.abono){ texto = `ABONO${rec.abono.motivo?' — '+esc(rec.abono.motivo):''}`; }
+    else if(rec.folga){ texto = `FOLGA (${rec.folga.horasConvertidas||0}h)${rec.folga.motivo?' — '+esc(rec.folga.motivo):''}`; }
     else if(rec.diarista){
       const e=timeToMinutes(rec.entrada), s=timeToMinutes(rec.saida);
       if(e!==null && s!==null){ mins = Math.max(0,s-e); texto = formatMinutes(mins); }
@@ -1048,6 +1311,18 @@ on('demitirBtn','click', demitir);
 on('readmitirBtn','click', readmitir);
 on('configPagamentoBtn','click', openPayConfig);
 on('payConfigCancel','click', ()=>document.getElementById('payConfigOverlay').classList.remove('show'));
+
+on('marcarAbonoBtn','click', openAbonoModal);
+on('abonoCancel','click', ()=>document.getElementById('abonoOverlay').classList.remove('show'));
+on('abonoSave','click', saveAbono);
+
+on('converterFolgaBtn','click', openFolgaModal);
+on('folgaCancel','click', ()=>document.getElementById('folgaOverlay').classList.remove('show'));
+on('folgaSave','click', saveFolga);
+
+on('pagarDinheiroBtn','click', openDinheiroModal);
+on('dinheiroCancel','click', ()=>document.getElementById('dinheiroOverlay').classList.remove('show'));
+on('dinheiroSave','click', saveDinheiro);
 on('payConfigSave','click', savePayConfig);
 on('tipoPagamentoSelect','change', toggleTipoPagamentoFields);
 on('vtAtivoCheck','change', toggleVTFields);
