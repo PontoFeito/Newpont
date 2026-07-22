@@ -1003,14 +1003,23 @@ function calcDiaria(mins){
   const base = Number(v['4']||v[4]||0);
   return { tier:null, valor: base ? (base/4)*horas : 0, estimado:true };
 }
-function calcTotal(rec){
+function calcTotal(rec, key){
   if(!rec) return null;
   if(rec.falta) return {falta:true, text:'Falta', mins:0, complete:true, extraMins:0, normalMins:0};
+  // Sábado e domingo não são dias úteis normais — qualquer coisa trabalhada
+  // neles conta inteira como hora extra, mesmo que não passe de 6h.
+  let fimDeSemana = false;
+  if(key){
+    const [y,m,d] = key.split('-').map(Number);
+    const dow = new Date(y, m-1, d).getDay(); // 0=domingo, 6=sábado
+    fimDeSemana = (dow===0 || dow===6);
+  }
   if(rec.diarista){
     const e = timeToMinutes(rec.entrada);
     const s = timeToMinutes(rec.saida);
     if(e===null || s===null) return null;
     const mins = Math.max(0, s-e);
+    if(fimDeSemana) return {text:formatMinutes(mins), mins, complete:true, extraMins:mins, normalMins:0, diarista:true};
     return {text:formatMinutes(mins), mins, complete:true, extraMins:0, normalMins:mins, diarista:true};
   }
   const e = timeToMinutes(rec.entrada);
@@ -1022,7 +1031,7 @@ function calcTotal(rec){
   if(e!==null && as!==null){ mins += (as-e); } else complete = false;
   if(av!==null && s!==null){ mins += (s-av); } else complete = false;
   if(mins<=0 && !complete) return null;
-  const extraMins = mins > LIMITE_NORMAL_MIN ? mins - LIMITE_NORMAL_MIN : 0;
+  const extraMins = fimDeSemana ? mins : (mins > LIMITE_NORMAL_MIN ? mins - LIMITE_NORMAL_MIN : 0);
   const normalMins = mins - extraMins;
   return {text:formatMinutes(mins), mins, complete, extraMins, normalMins};
 }
@@ -1510,6 +1519,20 @@ window.addEventListener('unhandledrejection', (e)=>{
   console.error('Erro assíncrono:', e.reason);
   notifyUnexpectedError();
 });
+// Escapa texto vindo de qualquer lugar antes de colocar na tela via
+// innerHTML — evita que algo digitado (ex.: justificativa) vire código
+// que roda na tela.
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Neutraliza "injeção de fórmula": se um texto digitado (como o nome)
+// começar com =, +, -, @ ou tab, o Excel pode interpretar como fórmula
+// ao abrir o arquivo exportado. Prefixar com aspa simples desativa isso
+// sem mudar como o texto aparece pra quem só está lendo.
+function safeCell(s){
+  const str = String(s==null?'':s);
+  return /^[=+\-@\t]/.test(str) ? "'" + str : str;
+}
 // Liga um evento a um elemento sem deixar que um erro dentro do handler
 // (ou um id que não existe) interrompa o resto dos listeners do app.
 function on(id, event, handler){
@@ -1565,23 +1588,59 @@ function getLocationForPunch(){
       resolve({ok:false, error:'Este aparelho/navegador não tem suporte a localização.'});
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos)=>{
+    let melhor = null;
+    let watchId = null;
+    let terminado = false;
+    const ACCURACY_BOA = 30; // metros — se já conseguir isso, usa na hora sem esperar mais
+    const TEMPO_MAX = 12000; // espera no máximo 12s tentando melhorar a precisão
+
+    function finalizar(){
+      if(terminado) return;
+      terminado = true;
+      clearTimeout(timeoutId);
+      if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if(melhor){
         resolve({ok:true, loc:{
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          lat: melhor.coords.latitude,
+          lng: melhor.coords.longitude,
+          accuracy: melhor.coords.accuracy,
           capturedAt: new Date().toISOString()
         }});
+      }else{
+        resolve({ok:false, error:'Não foi possível obter sua localização com precisão suficiente. Tente em local aberto, com GPS ativado.'});
+      }
+    }
+
+    const timeoutId = setTimeout(finalizar, TEMPO_MAX);
+
+    // Em vez de aceitar a primeira leitura (que costuma ser grosseira, baseada
+    // em wifi/torres de celular), fica escutando várias leituras e guarda a
+    // mais precisa (menor "accuracy" em metros) até o tempo máximo, ou até
+    // já achar uma leitura boa o suficiente.
+    watchId = navigator.geolocation.watchPosition(
+      (pos)=>{
+        if(!melhor || pos.coords.accuracy < melhor.coords.accuracy){
+          melhor = pos;
+        }
+        if(pos.coords.accuracy <= ACCURACY_BOA){
+          finalizar();
+        }
       },
       (err)=>{
-        let msg = 'Não foi possível obter sua localização.';
-        if(err.code === 1) msg = 'Localização negada. Ative a permissão de localização pra bater o ponto.';
-        else if(err.code === 2) msg = 'Localização indisponível. Verifique o GPS e tente de novo.';
-        else if(err.code === 3) msg = 'Tempo esgotado ao buscar localização. Tente de novo.';
-        resolve({ok:false, error:msg});
+        if(!melhor){
+          terminado = true;
+          clearTimeout(timeoutId);
+          if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+          let msg = 'Não foi possível obter sua localização.';
+          if(err.code === 1) msg = 'Localização negada. Ative a permissão de localização pra bater o ponto.';
+          else if(err.code === 2) msg = 'Localização indisponível. Verifique o GPS e tente de novo.';
+          else if(err.code === 3) msg = 'Tempo esgotado ao buscar localização. Tente de novo.';
+          resolve({ok:false, error:msg});
+        }
+        // se já tinha uma leitura razoável, ignora o erro pontual e deixa
+        // o tempo máximo decidir com a melhor leitura que já tiver
       },
-      { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+      { enableHighAccuracy:true, timeout:TEMPO_MAX, maximumAge:0 }
     );
   });
 }
@@ -1698,7 +1757,7 @@ function renderToday(){
       item.classList.remove('done');
     }
   });
-  const tot = calcTotal(rec);
+  const tot = calcTotal(rec, todayKey());
   let totalTexto = tot ? (tot.falta ? 'Falta registrada' : tot.text + (tot.complete?'':' (parcial)')) : '—';
   if(rec.pendingRequest) totalTexto += ' · ⏳ ajuste pendente de aprovação';
   document.getElementById('totalHoje').textContent = totalTexto;
@@ -2254,7 +2313,7 @@ function computePayrollBreakdown(mk){
     const dv = (employee && employee.diariaValores) || {};
     Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
       const rec = records[k];
-      const t = calcTotal(rec);
+      const t = calcTotal(rec, k);
       if(t && !t.falta && rec.entrada && rec.saida){
         const horas = t.mins/60;
         const faixa = horas>=8 ? 8 : (horas>=6 ? 6 : 4);
@@ -2273,7 +2332,7 @@ function computePayrollBreakdown(mk){
 
   let extraMesMins = 0;
   Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
-    const t = calcTotal(records[k]);
+    const t = calcTotal(records[k], k);
     if(t && !t.falta) extraMesMins += t.extraMins;
   });
 
@@ -2354,7 +2413,7 @@ function renderHistory(){
   let totalMins = 0;
   let totalExtraMins = 0;
   keys.forEach(k=>{
-    const tot = calcTotal(records[k]);
+    const tot = calcTotal(records[k], k);
     if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
   });
   const th = Math.floor(totalMins/60), tm = totalMins%60;
@@ -2368,7 +2427,7 @@ function renderHistory(){
   }
   tbody.innerHTML = keys.map(key=>{
     const rec = records[key];
-    const tot = calcTotal(rec);
+    const tot = calcTotal(rec, key);
     if(tot && tot.falta){
       return `<tr>
         <td>${displayDateShort(key)}</td>
@@ -2418,7 +2477,7 @@ function renderFullscreen(){
   const keys = Object.keys(records).filter(k=>monthKeyOf(k)===mk).sort();
   let totalMins = 0, totalExtraMins = 0;
   keys.forEach(k=>{
-    const tot = calcTotal(records[k]);
+    const tot = calcTotal(records[k], k);
     if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
   });
   const th = Math.floor(totalMins/60), tm = totalMins%60;
@@ -2433,7 +2492,7 @@ function renderFullscreen(){
   }
   body.innerHTML = keys.map(key=>{
     const rec = records[key];
-    const tot = calcTotal(rec);
+    const tot = calcTotal(rec, key);
     if(tot && tot.falta){
       return `<div class="fs-card">
         <div class="fs-card-date">${displayDate(key)} <span class="fs-card-falta">FALTA</span></div>
@@ -2489,7 +2548,7 @@ function buildReportRows(){
   const keys = Object.keys(records).sort();
   return keys.map(key=>{
     const rec = records[key];
-    const tot = calcTotal(rec);
+    const tot = calcTotal(rec, key);
     return {key, rec, tot, isFalta: !!(tot && tot.falta)};
   });
 }
@@ -2555,7 +2614,7 @@ async function exportA4(){
       th{ background:#111; color:#fff; }
       tr:nth-child(even){ background:#f5f5f5; }
     </style></head><body>
-      <h1>Controle de Ponto — ${nome}</h1>
+      <h1>Controle de Ponto — ${esc(nome)}</h1>
       <div class="sub">Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
       <table>
         <thead><tr><th>Data</th><th>Entrada</th><th>Saída Almoço</th><th>Volta Almoço</th><th>Saída</th><th>Total</th><th>Hora Extra</th></tr></thead>
@@ -2600,7 +2659,7 @@ async function exportExcel(){
     <head><meta charset="UTF-8"></head><body>
       <table border="1">
         <tr><td colspan="7" style="font-weight:bold;">Funcionário</td></tr>
-        <tr><td colspan="7">${nome}</td></tr>
+        <tr><td colspan="7">${esc(safeCell(nome))}</td></tr>
         <tr><td colspan="7"></td></tr>
         <tr style="background:#111;color:#fff;font-weight:bold;">
           <td>Data</td><td>Entrada</td><td>Saída Almoço</td><td>Volta Almoço</td><td>Saída</td><td>Total</td><td>Hora Extra</td>
@@ -2682,10 +2741,10 @@ async function importCSVFile(file){
 function exportCSV(){
   const keys = Object.keys(records).sort();
   if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
-  let csv = 'Funcionario;' + (profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
+  let csv = 'Funcionario;' + safeCell(profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Falta\n';
   keys.forEach(key=>{
     const rec = records[key];
-    const tot = calcTotal(rec);
+    const tot = calcTotal(rec, key);
     if(tot && tot.falta){
       csv += [displayDateShort(key), '', '', '', '', '', '', 'SIM'].join(';') + '\n';
     }else{

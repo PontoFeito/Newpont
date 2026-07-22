@@ -216,6 +216,10 @@ tbody tr:hover{background:var(--accent-tint);}
       <span class="back-link" id="backToListBtn">‹ voltar para a lista</span>
       <h2 id="detailNome" style="font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase; margin-top:6px;"></h2>
       <div id="detailStatusTag" style="margin-bottom:14px;"></div>
+      <details style="margin-bottom:14px;">
+        <summary style="font-size:12.5px; color:var(--muted); cursor:pointer;">Detalhes da conta</summary>
+        <p style="font-size:12.5px; color:var(--muted); margin:8px 0 0; font-family:'Space Mono',monospace;" id="detailContaInfo"></p>
+      </details>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
         <button class="btn outline small" id="demitirBtn">Demitir</button>
@@ -329,6 +333,12 @@ function showToast(msg, ms=3500){
   t._timer = setTimeout(()=>t.classList.remove('show'), ms);
 }
 function on(id, ev, fn){ const el=document.getElementById(id); if(el) el.addEventListener(ev, fn); }
+// Escapa texto vindo de qualquer lugar (nome de funcionário, justificativa,
+// etc.) antes de colocar na tela via innerHTML — sem isso, alguém poderia
+// digitar código HTML/JS no lugar de um nome e ele rodaria na tela do ADM.
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 async function authToken(){
   return auth.currentUser ? await auth.currentUser.getIdToken() : null;
@@ -554,20 +564,20 @@ async function loadSolicitacoes(){
     const novo = s.novo || {};
     let diffHtml;
     if(s.tipo === 'exclusao'){
-      diffHtml = `<span style="color:var(--stamp-red);">Excluir o dia inteiro</span> (valores atuais: ${Object.keys(LABELS_CAMPO).filter(k=>k!=='falta').map(k=>antigo[k]?`${LABELS_CAMPO[k]} ${antigo[k]}`:null).filter(Boolean).join(', ') || (antigo.falta?'Falta':'sem registros')})`;
+      diffHtml = `<span style="color:var(--stamp-red);">Excluir o dia inteiro</span> (valores atuais: ${esc(Object.keys(LABELS_CAMPO).filter(k=>k!=='falta').map(k=>antigo[k]?`${LABELS_CAMPO[k]} ${antigo[k]}`:null).filter(Boolean).join(', ') || (antigo.falta?'Falta':'sem registros'))})`;
     }else{
       const campos = Object.keys(LABELS_CAMPO);
       const linhas = campos.filter(k=> (antigo[k]||null) !== (novo[k]||null) ).map(k=>{
         const de = k==='falta' ? (antigo.falta?'Falta':'—') : (antigo[k]||'—');
         const para = k==='falta' ? (novo.falta?'Falta':'—') : (novo[k]||'—');
-        return `${LABELS_CAMPO[k]}: <b>${de}</b> → <b>${para}</b>`;
+        return `${esc(LABELS_CAMPO[k])}: <b>${esc(de)}</b> → <b>${esc(para)}</b>`;
       });
       diffHtml = linhas.length ? linhas.join('<br>') : 'Sem diferenças nos horários.';
     }
     return `<div style="border-bottom:1px solid var(--line); padding:10px 0;">
-      <div><strong>${s.nomeFuncionario||'—'}</strong> · ${(s.dateKey||'').split('-').reverse().join('/')} · ${s.tipo==='exclusao'?'Exclusão':'Edição'}</div>
+      <div><strong>${esc(s.nomeFuncionario||'—')}</strong> · ${esc((s.dateKey||'').split('-').reverse().join('/'))} · ${s.tipo==='exclusao'?'Exclusão':'Edição'}</div>
       <div style="font-size:13px; margin:6px 0;">${diffHtml}</div>
-      <div style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Justificativa: "${(s.justificativa||'').replace(/</g,'&lt;')}"${s.editadoEm ? ' <em>(ajustado pelo funcionário depois de enviado)</em>' : ''}</div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Justificativa: "${esc(s.justificativa||'')}"${s.editadoEm ? ' <em>(ajustado pelo funcionário depois de enviado)</em>' : ''}</div>
       <div class="row-actions">
         <button class="btn small outline" data-approve="${s.id}" data-uid="${s.uid}">Aprovar</button>
         <button class="btn small danger" data-reject="${s.id}" data-uid="${s.uid}">Rejeitar</button>
@@ -700,15 +710,14 @@ async function recuperarUidExistente(){
 function renderEmployeesTable(){
   const wrap = document.getElementById('employeesTableWrap');
   if(employees.length === 0){ wrap.innerHTML = '<p>Nenhum funcionário cadastrado ainda.</p>'; return; }
-  wrap.innerHTML = `<table><thead><tr><th>Nome</th><th>Identificação</th><th>Status</th><th>Pagamento</th><th></th></tr></thead><tbody>
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Status</th><th>Pagamento</th><th></th></tr></thead><tbody>
     ${employees.map(e=>`<tr>
-      <td>${e.nome||'—'}</td>
-      <td>${e.identifier||'—'}</td>
-      <td><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span></td>
+      <td>${esc(e.nome||'—')}</td>
+      <td><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span></td>
       <td>${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}</td>
-      <td><button class="btn small outline" data-uid="${e.uid}">Ver</button></td>
+      <td><button class="btn small outline" data-uid="${esc(e.uid)}">Ver</button></td>
     </tr>`).join('')}
-  </tbody></table>`;
+  </tbody></table></div>`;
   wrap.querySelectorAll('button[data-uid]').forEach(btn=>{
     btn.addEventListener('click', ()=>openDetail(btn.getAttribute('data-uid')));
   });
@@ -739,7 +748,8 @@ async function openDetail(uid){
   document.getElementById('listCard').classList.add('hidden');
   document.getElementById('detailCard').classList.remove('hidden');
   document.getElementById('detailNome').textContent = e.nome || '—';
-  document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${e.status||'ativo'}</span> · ${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}`;
+  document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span> · ${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}`;
+  document.getElementById('detailContaInfo').innerHTML = `Identificação: ${esc(e.identifier||'—')}<br>UID: ${esc(e.uid)}`;
   viewMonth = new Date().toISOString().slice(0,7);
   await renderMonth();
 }
