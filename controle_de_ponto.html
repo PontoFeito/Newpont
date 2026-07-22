@@ -1610,8 +1610,8 @@ function getLocationForPunch(){
     let melhor = null;
     let watchId = null;
     let terminado = false;
-    const ACCURACY_BOA = 30; // metros — se já conseguir isso, usa na hora sem esperar mais
-    const TEMPO_MAX = 12000; // espera no máximo 12s tentando melhorar a precisão
+    const ACCURACY_BOA = 60; // metros — se já conseguir isso, usa na hora sem esperar mais
+    const TEMPO_MAX = 8000; // espera no máximo 8s tentando melhorar a precisão
 
     function finalizar(){
       if(terminado) return;
@@ -1626,16 +1626,15 @@ function getLocationForPunch(){
           capturedAt: new Date().toISOString()
         }});
       }else{
-        resolve({ok:false, error:'Não foi possível obter sua localização com precisão suficiente. Tente em local aberto, com GPS ativado.'});
+        resolve({ok:false, error:'Não foi possível obter sua localização.'});
       }
     }
 
     const timeoutId = setTimeout(finalizar, TEMPO_MAX);
 
-    // Em vez de aceitar a primeira leitura (que costuma ser grosseira, baseada
-    // em wifi/torres de celular), fica escutando várias leituras e guarda a
-    // mais precisa (menor "accuracy" em metros) até o tempo máximo, ou até
-    // já achar uma leitura boa o suficiente.
+    // Fica escutando leituras e guarda a mais precisa até o tempo máximo,
+    // ou até já achar uma leitura razoável (não precisa ser perfeita —
+    // o ponto tem que ser batido mesmo que o GPS não esteja ótimo).
     watchId = navigator.geolocation.watchPosition(
       (pos)=>{
         if(!melhor || pos.coords.accuracy < melhor.coords.accuracy){
@@ -1651,9 +1650,9 @@ function getLocationForPunch(){
           clearTimeout(timeoutId);
           if(watchId !== null) navigator.geolocation.clearWatch(watchId);
           let msg = 'Não foi possível obter sua localização.';
-          if(err.code === 1) msg = 'Localização negada. Ative a permissão de localização pra bater o ponto.';
-          else if(err.code === 2) msg = 'Localização indisponível. Verifique o GPS e tente de novo.';
-          else if(err.code === 3) msg = 'Tempo esgotado ao buscar localização. Tente de novo.';
+          if(err.code === 1) msg = 'Localização negada.';
+          else if(err.code === 2) msg = 'Localização indisponível (verifique o GPS).';
+          else if(err.code === 3) msg = 'Tempo esgotado ao buscar localização.';
           resolve({ok:false, error:msg});
         }
         // se já tinha uma leitura razoável, ignora o erro pontual e deixa
@@ -1684,7 +1683,7 @@ async function registrar(tipo, loc){
   }
   renderToday();
   renderHistory();
-  showToast(`${LABELS[tipo]} registrada às ${horario} (com localização)`);
+  showToast(`${LABELS[tipo]} registrada às ${horario}` + (loc ? ' (com localização)' : ' (sem localização)'));
 }
 
 async function handlePunch(){
@@ -1713,13 +1712,13 @@ async function handlePunch(){
   const subBackup = subEl.textContent;
   subEl.textContent = 'Obtendo localização...';
   const res = await getLocationForPunch();
+  // A localização é só um extra de referência — o horário do ponto NUNCA
+  // fica travado por causa de GPS ruim ou indisponível. Se não conseguir
+  // capturar, registra o horário mesmo assim, sem local.
   if(!res.ok){
-    showToast(res.error, 6000);
-    subEl.textContent = subBackup;
-    updatePunchButton();
-    return;
+    showToast('Localização não capturada (' + res.error + '). O ponto foi registrado mesmo assim.', 6000);
   }
-  await registrar(tipo, res.loc);
+  await registrar(tipo, res.ok ? res.loc : null);
 }
 
 function updatePunchButton(){
