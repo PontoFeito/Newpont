@@ -225,6 +225,7 @@ tbody tr:hover{background:var(--accent-tint);}
         <button class="btn outline small" id="demitirBtn">Demitir</button>
         <button class="btn outline small" id="readmitirBtn">Readmitir</button>
         <button class="btn outline small" id="configPagamentoBtn">Configurar pagamento / diária</button>
+        <button class="btn outline small" id="ajusteManualBtn">✎ Ajustar horários manualmente</button>
       </div>
 
       <div class="card" style="border-color:#8a5a00; margin-bottom:16px;">
@@ -296,6 +297,33 @@ tbody tr:hover{background:var(--accent-tint);}
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="btn outline" id="folgaCancel">Cancelar</button>
       <button class="btn" id="folgaSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: ajuste manual de horários -->
+<div class="modal-overlay" id="ajusteManualOverlay">
+  <div class="modal" style="max-height:85vh; overflow-y:auto;">
+    <h3>Ajustar horários manualmente</h3>
+    <p class="hint-text">Ajuste direto, sem precisar de solicitação do funcionário. Se o dia estiver marcado como folga/abono e a pessoa realmente trabalhou, preencha os horários abaixo — a folga/abono é desfeita e as horas voltam a contar normalmente.</p>
+    <div class="field-row"><label for="ajusteData">Data</label><input type="date" id="ajusteData"></div>
+    <p id="ajusteAvisoEspecial" class="hint-text" style="display:none; color:#8a5a00; font-weight:bold;"></p>
+    <div class="field-row" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="ajusteFalta" style="width:auto;">
+      <label for="ajusteFalta" style="text-transform:none;letter-spacing:0;font-weight:normal;margin:0;">Marcar como falta</label>
+    </div>
+    <div id="ajusteHorariosFields">
+      <div class="field-row"><label for="ajusteEntrada">Entrada</label><input type="time" id="ajusteEntrada"></div>
+      <div class="field-row" id="ajusteAlmocoRow">
+        <label for="ajusteAlmocoSaida">Saída Almoço</label><input type="time" id="ajusteAlmocoSaida">
+        <label for="ajusteAlmocoVolta" style="margin-top:8px;">Volta Almoço</label><input type="time" id="ajusteAlmocoVolta">
+      </div>
+      <div class="field-row"><label for="ajusteSaida">Saída</label><input type="time" id="ajusteSaida"></div>
+    </div>
+    <div class="field-row"><label for="ajusteMotivo">Motivo do ajuste (referência)</label><textarea id="ajusteMotivo" rows="2" placeholder="Ex.: esqueceu de bater o ponto, trabalhou no dia da folga..."></textarea></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="ajusteManualCancel">Cancelar</button>
+      <button class="btn" id="ajusteManualSave">Salvar</button>
     </div>
   </div>
 </div>
@@ -979,9 +1007,92 @@ async function renderSaldoExtra(){
 }
 function formatBRL(n){ return (Number(n)||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
 
-function openAbonoModal(){
+// --- ajuste manual de horários (o admin edita direto, sem solicitação) ---
+function toggleAjusteFaltaFields(){
+  const falta = document.getElementById('ajusteFalta').checked;
+  document.getElementById('ajusteHorariosFields').style.display = falta ? 'none' : 'block';
+}
+async function openAjusteManualModal(dateKey){
+  document.getElementById('ajusteData').value = dateKey || '';
+  document.getElementById('ajusteMotivo').value = '';
+  document.getElementById('ajusteFalta').checked = false;
+  document.getElementById('ajusteEntrada').value = '';
+  document.getElementById('ajusteAlmocoSaida').value = '';
+  document.getElementById('ajusteAlmocoVolta').value = '';
+  document.getElementById('ajusteSaida').value = '';
+  document.getElementById('ajusteAvisoEspecial').style.display = 'none';
+  if(dateKey){
+    const records = await fetchRecords(currentDetailUid);
+    const rec = records[dateKey];
+    if(rec){
+      if(rec.falta) document.getElementById('ajusteFalta').checked = true;
+      if(rec.entrada) document.getElementById('ajusteEntrada').value = rec.entrada.slice(0,5);
+      if(rec.almocoSaida) document.getElementById('ajusteAlmocoSaida').value = rec.almocoSaida.slice(0,5);
+      if(rec.almocoVolta) document.getElementById('ajusteAlmocoVolta').value = rec.almocoVolta.slice(0,5);
+      if(rec.saida) document.getElementById('ajusteSaida').value = rec.saida.slice(0,5);
+      const aviso = document.getElementById('ajusteAvisoEspecial');
+      if(rec.folga){
+        aviso.textContent = `Este dia está marcado como FOLGA (motivo: ${rec.folga.motivo||'—'}). Preenchendo os horários e salvando, a folga é desfeita e as horas usadas voltam pro saldo.`;
+        aviso.style.display = 'block';
+      }else if(rec.abono){
+        aviso.textContent = `Este dia está marcado como ABONO (motivo: ${rec.abono.motivo||'—'}). Preenchendo os horários e salvando, o abono é desfeito.`;
+        aviso.style.display = 'block';
+      }
+    }
+  }
+  toggleAjusteFaltaFields();
+  document.getElementById('ajusteManualOverlay').classList.add('show');
+}
+async function saveAjusteManual(){
+  const dateKey = document.getElementById('ajusteData').value;
+  const falta = document.getElementById('ajusteFalta').checked;
+  const motivo = document.getElementById('ajusteMotivo').value.trim();
+  if(!dateKey){ showToast('Escolha uma data.'); return; }
+  const records = await fetchRecords(currentDetailUid);
+  const anterior = records[dateKey];
+  const eraFolgaOuAbono = !!(anterior && (anterior.folga || anterior.abono));
+  if(falta){
+    records[dateKey] = { entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:true };
+  }else{
+    const vals = {
+      entrada: document.getElementById('ajusteEntrada').value,
+      almocoSaida: document.getElementById('ajusteAlmocoSaida').value,
+      almocoVolta: document.getElementById('ajusteAlmocoVolta').value,
+      saida: document.getElementById('ajusteSaida').value,
+    };
+    const rec = { falta:false };
+    ['entrada','almocoSaida','almocoVolta','saida'].forEach(t=>{ rec[t] = vals[t] ? vals[t]+':00' : null; });
+    records[dateKey] = rec;
+  }
+  if(motivo) records[dateKey].motivoAjusteAdmin = motivo;
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast(eraFolgaOuAbono ? 'Horários ajustados — folga/abono desfeito(a).' : 'Horários ajustados.');
+    document.getElementById('ajusteManualOverlay').classList.remove('show');
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível salvar.');
+}
+
+// Tira uma folga ou abono de um dia específico (o dia volta a ficar em
+// branco, e as horas usadas na folga voltam pro saldo automaticamente,
+// já que o saldo é sempre recalculado a partir dos registros atuais).
+async function removerFolgaOuAbono(dateKey){
+  const records = await fetchRecords(currentDetailUid);
+  const rec = records[dateKey];
+  if(!rec || (!rec.folga && !rec.abono)) return;
+  const tipo = rec.folga ? 'folga' : 'abono';
+  if(!confirm(`Tirar a ${tipo} do dia ${dateKey.split('-').reverse().join('/')}? O dia volta a ficar em branco.`)) return;
+  delete records[dateKey];
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast(`${tipo==='folga'?'Folga':'Abono'} removido(a).`);
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível remover.');
+}
+
+function openAbonoModal(dateKey){
   const e = employees.find(x=>x.uid===currentDetailUid);
-  document.getElementById('abonoData').value = '';
+  document.getElementById('abonoData').value = dateKey || '';
   document.getElementById('abonoMotivo').value = '';
   document.getElementById('abonoValorSelect').value = '';
   document.getElementById('abonoValorRow').style.display = e && e.tipoPagamento==='diarista' ? 'block' : 'none';
@@ -1012,12 +1123,12 @@ async function saveAbono(){
   }else showToast('Não foi possível salvar.');
 }
 
-function openFolgaModal(){
+function openFolgaModal(dateKey){
   const e = employees.find(x=>x.uid===currentDetailUid);
-  document.getElementById('folgaData').value = '';
+  document.getElementById('folgaData').value = dateKey || '';
   document.getElementById('folgaHorasH').value = '';
   document.getElementById('folgaHorasM').value = '';
-  document.getElementById('folgaMotivo').value = '';
+  document.getElementById('folgaMotivo').value = dateKey ? 'Complementação de dia faltante com saldo de hora extra' : '';
   document.getElementById('folgaValorSelect').value = '';
   document.getElementById('folgaValorRow').style.display = e && e.tipoPagamento==='diarista' ? 'block' : 'none';
   document.getElementById('folgaOverlay').classList.add('show');
@@ -1084,18 +1195,71 @@ async function saveDinheiro(){
     await renderSaldoExtra();
   }else showToast('Não foi possível salvar.');
 }
+// Dias úteis (seg. a sex.) do mês `mk` que já passaram (até hoje) e que
+// não têm NENHUM registro salvo — nem batida, nem falta marcada, nem
+// abono, nem folga. É o "limbo": o funcionário simplesmente não bateu
+// ponto naquele dia e ninguém decidiu ainda o que fazer com ele.
+const DIAS_SEMANA_CURTO = ['dom','seg','ter','qua','qui','sex','sáb'];
+function diasPendentesDoMes(records, mk){
+  const [y,m] = mk.split('-').map(Number);
+  const diasNoMes = new Date(y, m, 0).getDate();
+  const hojeKey = new Date().toISOString().slice(0,10);
+  const pendentes = [];
+  for(let d=1; d<=diasNoMes; d++){
+    const key = `${y}-${pad(m)}-${pad(d)}`;
+    if(key > hojeKey) break; // não avalia dias futuros
+    const dow = new Date(y, m-1, d).getDay();
+    if(dow===0 || dow===6) continue; // considera só dias úteis (seg-sex)
+    if(!records[key]) pendentes.push(key);
+  }
+  return pendentes;
+}
+function renderPendenciasHtml(pendentes){
+  if(pendentes.length===0) return '';
+  return `<div class="card" style="border-color:var(--stamp-red); background:#fdf3f2; margin-bottom:16px; padding:16px;">
+    <p style="font-weight:bold; color:var(--stamp-red); margin:0 0 4px;">⚠️ ${pendentes.length} dia(s) útil(eis) sem nenhum registro neste mês</p>
+    <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px;">O funcionário não bateu ponto e ninguém decidiu ainda como resolver. Escolha uma ação pra cada dia — senão ele fica "no limbo" e pode ser esquecido na hora de fechar a folha.</p>
+    ${pendentes.map(k=>{
+      const [y,m,d] = k.split('-').map(Number);
+      const dow = DIAS_SEMANA_CURTO[new Date(y,m-1,d).getDay()];
+      return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 0; border-bottom:1px dashed var(--line);">
+        <div><b>${k.split('-').reverse().join('/')}</b> <span style="color:var(--muted); font-size:12px;">(${dow})</span></div>
+        <div class="row-actions">
+          <button class="btn small danger" data-marcar-falta="${k}" title="Marca falta — desconta o dia no fechamento">Descontar</button>
+          <button class="btn small outline" data-complementar="${k}" title="Usa o saldo de hora extra pra cobrir o dia, sem desconto">Complementar c/ hora extra</button>
+          <button class="btn small outline" data-abonar="${k}" title="Dia dispensado, com direito a pagamento">Abonar</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 async function renderMonth(){
-  document.getElementById('monthLabel').textContent = monthLabelOf(viewMonth);
   const wrap = document.getElementById('monthTableWrap');
   wrap.innerHTML = 'Carregando…';
   const records = await fetchRecords(currentDetailUid);
+  const pendentes = diasPendentesDoMes(records, viewMonth);
+  document.getElementById('monthLabel').innerHTML = esc(monthLabelOf(viewMonth)) +
+    (pendentes.length>0 ? ` <span class="tag demitido" title="Dias sem nenhum registro">${pendentes.length} pendente${pendentes.length>1?'s':''}</span>` : '');
+  const pendenciaHtml = renderPendenciasHtml(pendentes);
   const dias = Object.keys(records).filter(k=>k.startsWith(viewMonth)).sort();
-  if(dias.length===0){ wrap.innerHTML = '<p>Sem batidas neste mês.</p>'; return; }
+  if(dias.length===0){
+    wrap.innerHTML = pendenciaHtml || '<p>Sem batidas neste mês.</p>';
+    wrap.querySelectorAll('[data-marcar-falta]').forEach(btn=>{
+      btn.addEventListener('click', ()=> abrirAjusteFaltaRapido(btn.dataset.marcarFalta));
+    });
+    wrap.querySelectorAll('[data-abonar]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openAbonoModal(btn.dataset.abonar));
+    });
+    wrap.querySelectorAll('[data-complementar]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openFolgaModal(btn.dataset.complementar));
+    });
+    return;
+  }
   let totalMins = 0;
   const linhas = dias.map(dateKey=>{
     const rec = records[dateKey];
     let mins = 0, texto='';
-    if(rec.falta){ texto = 'FALTA'; }
+    if(rec.falta){ texto = '<span style="color:var(--stamp-red);">FALTA</span> <span style="color:var(--muted); font-size:11px;">(desconta)</span>'; }
     else if(rec.abono){ texto = `ABONO${rec.abono.motivo?' — '+esc(rec.abono.motivo):''}`; }
     else if(rec.folga){ texto = `FOLGA (${formatMinutes(folgaMinutosConsumidos(rec.folga))})${rec.folga.motivo?' — '+esc(rec.folga.motivo):''}`; }
     else if(rec.diarista){
@@ -1120,11 +1284,41 @@ async function renderMonth(){
       <td>${rec.saida||'—'}</td>
       <td>${texto}</td>
       <td>${locLinks||'—'}</td>
+      <td>
+        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+          <button class="btn small outline" data-ajustar-dia="${dateKey}" title="Ajustar manualmente">✎</button>
+          ${(rec.folga||rec.abono) ? `<button class="btn small outline" data-remover-dia="${dateKey}" title="Tirar folga/abono">✕</button>` : ''}
+          ${rec.falta ? `<button class="btn small outline" data-complementar="${dateKey}" title="Trocar falta por complemento com hora extra">🔁</button><button class="btn small outline" data-abonar="${dateKey}" title="Trocar falta por abono">🗓️</button>` : ''}
+        </div>
+      </td>
     </tr>`;
   }).join('');
-  wrap.innerHTML = `<p><strong>Total do mês:</strong> ${formatMinutes(totalMins)}</p>
-    <div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Entrada</th><th>S.Almoço</th><th>V.Almoço</th><th>Saída</th><th>Total</th><th>Local</th></tr></thead>
+  wrap.innerHTML = pendenciaHtml + `<p><strong>Total do mês:</strong> ${formatMinutes(totalMins)}</p>
+    <div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Entrada</th><th>S.Almoço</th><th>V.Almoço</th><th>Saída</th><th>Total</th><th>Local</th><th>Ações</th></tr></thead>
     <tbody>${linhas}</tbody></table></div>`;
+  wrap.querySelectorAll('[data-ajustar-dia]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openAjusteManualModal(btn.dataset.ajustarDia));
+  });
+  wrap.querySelectorAll('[data-remover-dia]').forEach(btn=>{
+    btn.addEventListener('click', ()=> removerFolgaOuAbono(btn.dataset.removerDia));
+  });
+  wrap.querySelectorAll('[data-marcar-falta]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirAjusteFaltaRapido(btn.dataset.marcarFalta));
+  });
+  wrap.querySelectorAll('[data-abonar]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openAbonoModal(btn.dataset.abonar));
+  });
+  wrap.querySelectorAll('[data-complementar]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openFolgaModal(btn.dataset.complementar));
+  });
+}
+// Atalho pra "Descontar" na lista de pendências: já abre o modal de ajuste
+// manual com a data preenchida e a caixa "Marcar como falta" já marcada —
+// o admin só confere o motivo e salva.
+async function abrirAjusteFaltaRapido(dateKey){
+  await openAjusteManualModal(dateKey);
+  document.getElementById('ajusteFalta').checked = true;
+  toggleAjusteFaltaFields();
 }
 
 // --- demitir / readmitir ---
@@ -1355,6 +1549,11 @@ on('demitirBtn','click', demitir);
 on('readmitirBtn','click', readmitir);
 on('configPagamentoBtn','click', openPayConfig);
 on('payConfigCancel','click', ()=>document.getElementById('payConfigOverlay').classList.remove('show'));
+
+on('ajusteManualBtn','click', ()=>openAjusteManualModal(null));
+on('ajusteManualCancel','click', ()=>document.getElementById('ajusteManualOverlay').classList.remove('show'));
+on('ajusteManualSave','click', saveAjusteManual);
+on('ajusteFalta','change', toggleAjusteFaltaFields);
 
 on('marcarAbonoBtn','click', openAbonoModal);
 on('abonoCancel','click', ()=>document.getElementById('abonoOverlay').classList.remove('show'));
