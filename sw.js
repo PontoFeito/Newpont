@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-ponto-v3';
+const CACHE_NAME = 'controle-ponto-v4';
 const ASSETS = [
   './controle_de_ponto.html',
   './manifest.json',
