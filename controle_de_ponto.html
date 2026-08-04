@@ -978,7 +978,14 @@ function formatBRL(n){
   return 'R$ ' + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-const LIMITE_NORMAL_MIN = 6*60; // 6 horas: acima disso vira hora extra
+// Jornada padrão em minutos — acima disso vira hora extra. Configurável
+// por funcionário pelo painel do admin (campo "jornadaPadraoMin"); se não
+// estiver configurada, cai no padrão histórico de 6h.
+const LIMITE_NORMAL_MIN_DEFAULT = 6*60;
+function jornadaPadraoMin(){
+  const v = employee && employee.jornadaPadraoMin;
+  return (v && v>0) ? v : LIMITE_NORMAL_MIN_DEFAULT;
+}
 
 function timeToMinutes(t){
   if(!t) return null;
@@ -1041,7 +1048,7 @@ function calcTotal(rec, key){
   if(e!==null && as!==null){ mins += (as-e); } else complete = false;
   if(av!==null && s!==null){ mins += (s-av); } else complete = false;
   if(mins<=0 && !complete) return null;
-  const extraMins = fimDeSemana ? mins : (mins > LIMITE_NORMAL_MIN ? mins - LIMITE_NORMAL_MIN : 0);
+  const extraMins = fimDeSemana ? mins : (mins > jornadaPadraoMin() ? mins - jornadaPadraoMin() : 0);
   const normalMins = mins - extraMins;
   return {text:formatMinutes(mins), mins, complete, extraMins, normalMins};
 }

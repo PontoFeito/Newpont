@@ -301,6 +301,40 @@ tbody tr:hover{background:var(--accent-tint);}
   </div>
 </div>
 
+<!-- modal: resolver jornada incompleta (dia com batida, mas abaixo da jornada padrão) -->
+<div class="modal-overlay" id="complementoOverlay">
+  <div class="modal">
+    <h3>Jornada incompleta</h3>
+    <p class="hint-text" id="complementoResumo">—</p>
+    <div class="field-row" style="display:flex;flex-direction:column;gap:8px;">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+        <input type="radio" name="complementoOpcao" id="complementoOpcaoSaldo" value="saldo" style="width:auto;" checked>
+        Completar com o saldo de hora extra (usa o banco positivo)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+        <input type="radio" name="complementoOpcao" id="complementoOpcaoNegativo" value="negativo" style="width:auto;">
+        Completar mesmo assim e deixar negativo (o funcionário fica devendo essas horas)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:normal;text-transform:none;letter-spacing:0;">
+        <input type="radio" name="complementoOpcao" id="complementoOpcaoAceitar" value="aceitar" style="width:auto;">
+        Não completar — aceitar o dia como está (desconta a diferença)
+      </label>
+    </div>
+    <div id="complementoSaldoFields">
+      <div class="field-row" style="display:flex; gap:10px;">
+        <div style="flex:1;"><label for="complementoHorasH">Horas a completar</label><input type="number" id="complementoHorasH" step="1" min="0"></div>
+        <div style="flex:1;"><label for="complementoHorasM">Minutos</label><input type="number" id="complementoHorasM" step="1" min="0" max="59"></div>
+      </div>
+    </div>
+    <div class="field-row"><label for="complementoMotivo">Motivo (obrigatório)</label><textarea id="complementoMotivo" rows="2" placeholder="Ex.: liberado mais cedo por atendimento médico, saída antecipada autorizada..."></textarea></div>
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button class="btn outline" id="complementoCancel">Cancelar</button>
+      <button class="btn" id="complementoSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- modal: ajuste manual de horários -->
 <div class="modal-overlay" id="ajusteManualOverlay">
   <div class="modal" style="max-height:85vh; overflow-y:auto;">
@@ -358,6 +392,12 @@ tbody tr:hover{background:var(--accent-tint);}
         <option value="clt">CLT</option>
         <option value="diarista">Diarista</option>
       </select>
+    </div>
+
+    <div class="field-row" id="jornadaPadraoRow">
+      <label for="jornadaPadraoHoras">Jornada diária padrão (horas)</label>
+      <input type="number" id="jornadaPadraoHoras" step="0.5" min="1" max="12" placeholder="Ex.: 6">
+      <p class="hint-text" style="margin-top:4px;">Usado pra calcular hora extra (acima disso) e pra avisar quando um dia fecha abaixo da jornada. Cada funcionário pode ter uma jornada diferente (ex.: CLT 8h, este funcionário 6h).</p>
     </div>
 
     <div id="salarioFields">
@@ -908,7 +948,11 @@ async function fetchExtrasPagos(uid){
 // Calcula, a partir dos pontos batidos, quanto de hora extra ainda não foi
 // usado (nem virado folga, nem pago em dinheiro) — mesma lógica de fim de
 // semana e diarista do app do funcionário, simplificada aqui.
-function calcExtraMinsDoRegistro(rec, key){
+// jornadaMin: jornada diária padrão daquele funcionário, em minutos —
+// acima disso vira hora extra. É configurável por funcionário (CLT pode
+// ter jornada diferente de estagiário/diarista), por isso é sempre
+// passada como parâmetro em vez de fixa.
+function calcExtraMinsDoRegistro(rec, key, jornadaMin){
   if(!rec || rec.falta || rec.abono || rec.folga) return 0;
   let fimDeSemana = false;
   if(key){
@@ -927,7 +971,7 @@ function calcExtraMinsDoRegistro(rec, key){
   if(e!==null && as!==null) mins += (as-e);
   if(av!==null && s!==null) mins += (s-av);
   if(mins<=0) return 0;
-  return fimDeSemana ? mins : (mins > 6*60 ? mins - 6*60 : 0);
+  return fimDeSemana ? mins : (mins > jornadaMin ? mins - jornadaMin : 0);
 }
 // Lê o consumo de saldo em minutos, aceitando tanto o formato novo
 // (minutos inteiros) quanto o antigo (horas em decimal, de versões
@@ -937,16 +981,61 @@ function folgaMinutosConsumidos(folga){
   if(folga.minutosConvertidos!=null) return Math.round(Number(folga.minutosConvertidos)||0);
   return Math.round((Number(folga.horasConvertidas)||0)*60);
 }
+// Jornada padrão em minutos — mesmo limite usado no app do funcionário pra
+// separar hora normal de hora extra. Cada funcionário pode ter a sua
+// (campo "jornadaPadraoMin" no cadastro); se não estiver configurada,
+// cai no padrão histórico de 6h.
+const JORNADA_PADRAO_MIN_DEFAULT = 6*60;
+function jornadaPadraoDoEmployee(e){
+  const v = e && e.jornadaPadraoMin;
+  return (v && v>0) ? v : JORNADA_PADRAO_MIN_DEFAULT;
+}
+function calcMinsTrabalhados(rec){
+  if(!rec) return 0;
+  const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
+  let mins = 0;
+  if(e!==null && as!==null) mins += (as-e);
+  if(av!==null && s!==null) mins += (s-av);
+  return mins;
+}
+function complementoMinutosConsumidos(c){
+  if(!c) return 0;
+  return Math.round(Number(c.minutos)||0);
+}
+function isDiaUtil(dateKey){
+  const [y,m,d] = dateKey.split('-').map(Number);
+  const dow = new Date(y, m-1, d).getDay();
+  return dow>=1 && dow<=5;
+}
+// Dias úteis (seg-sex) do mês que têm batida real, mas somam menos que a
+// jornada padrão daquele funcionário, e ainda não foram resolvidos (nem
+// complementados, nem aceitos assim mesmo pelo admin).
+function diasIncompletosDoMes(records, mk, jornadaMin){
+  const incompletos = [];
+  Object.keys(records).filter(k=>k.startsWith(mk)).forEach(k=>{
+    const rec = records[k];
+    if(!rec || rec.falta || rec.abono || rec.folga || rec.diarista || rec.complemento || rec.diaResolvido) return;
+    if(!isDiaUtil(k)) return; // fim de semana não segue a jornada padrão
+    const mins = calcMinsTrabalhados(rec);
+    if(mins>0 && mins < jornadaMin){
+      incompletos.push({key:k, mins, faltam: jornadaMin - mins});
+    }
+  });
+  return incompletos.sort((a,b)=>a.key.localeCompare(b.key));
+}
 function extraMinutosConsumidos(x){
   if(x.minutos!=null) return Math.round(Number(x.minutos)||0);
   return Math.round((Number(x.horas)||0)*60);
 }
 async function calcSaldoHoraExtra(uid){
   const [records, extras] = await Promise.all([fetchRecords(uid), fetchExtrasPagos(uid)]);
+  const e = employees.find(x=>x.uid===uid);
+  const jornadaMin = jornadaPadraoDoEmployee(e);
   let totalExtraMins = 0;
-  Object.keys(records).forEach(k=>{ totalExtraMins += Math.round(calcExtraMinsDoRegistro(records[k], k)); });
+  Object.keys(records).forEach(k=>{ totalExtraMins += Math.round(calcExtraMinsDoRegistro(records[k], k, jornadaMin)); });
   let usadoMins = 0;
   Object.keys(records).forEach(k=>{ usadoMins += folgaMinutosConsumidos(records[k].folga); });
+  Object.keys(records).forEach(k=>{ usadoMins += complementoMinutosConsumidos(records[k].complemento); });
   extras.forEach(x=>{ usadoMins += extraMinutosConsumidos(x); });
   return { saldoMins: Math.round(totalExtraMins - usadoMins), totalExtraMins, usadoMins, records, extras };
 }
@@ -976,6 +1065,16 @@ async function renderSaldoExtra(){
       delete records[k];
       const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
       if(ok){ showToast('Folga removida.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover.');
+    }});
+  });
+  Object.keys(records).filter(k=>records[k].complemento).forEach(k=>{
+    const mins = complementoMinutosConsumidos(records[k].complemento);
+    const tipoLabel = records[k].complemento.negativo ? `Complemento de jornada — negativo (${formatMinutes(mins)})` : `Complemento de jornada (${formatMinutes(mins)})`;
+    itens.push({data:k, tipo:tipoLabel, motivo:records[k].complemento.motivo||'', onDelete: async ()=>{
+      if(!confirm('Remover este complemento? As horas voltam pro saldo, e o dia volta a mostrar só o horário batido (incompleto).')) return;
+      delete records[k].complemento;
+      const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+      if(ok){ showToast('Complemento removido.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover.');
     }});
   });
   extras.forEach(x=>{
@@ -1089,6 +1188,21 @@ async function removerFolgaOuAbono(dateKey){
     await Promise.all([renderMonth(), renderSaldoExtra()]);
   }else showToast('Não foi possível remover.');
 }
+// Remove o complemento de jornada de um dia — as horas voltam pro saldo e
+// o dia volta a mostrar só o horário efetivamente batido (incompleto de novo).
+async function removerComplemento(dateKey){
+  const records = await fetchRecords(currentDetailUid);
+  const rec = records[dateKey];
+  if(!rec || !rec.complemento) return;
+  if(!confirm(`Remover o complemento do dia ${dateKey.split('-').reverse().join('/')}? As horas voltam pro saldo e o dia fica incompleto de novo.`)) return;
+  delete rec.complemento;
+  records[dateKey] = rec;
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast('Complemento removido.');
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível remover.');
+}
 
 function openAbonoModal(dateKey){
   const e = employees.find(x=>x.uid===currentDetailUid);
@@ -1165,6 +1279,70 @@ async function saveFolga(){
   }else showToast('Não foi possível salvar.');
 }
 
+// --- jornada incompleta: complementar com saldo de hora extra, ou aceitar
+// o dia curto assim mesmo — sempre pedindo o motivo, pra ficar registrado
+// por que aquele dia não bateu a jornada padrão.
+let complementoDateKey = null;
+function complementoOpcaoSelecionada(){
+  const el = document.querySelector('input[name="complementoOpcao"]:checked');
+  return el ? el.value : 'saldo';
+}
+function toggleComplementoFields(){
+  const opcao = complementoOpcaoSelecionada();
+  document.getElementById('complementoSaldoFields').style.display = (opcao==='saldo' || opcao==='negativo') ? 'block' : 'none';
+}
+async function openComplementoModal(dateKey){
+  complementoDateKey = dateKey;
+  const records = await fetchRecords(currentDetailUid);
+  const rec = records[dateKey];
+  const e = employees.find(x=>x.uid===currentDetailUid);
+  const jornadaMin = jornadaPadraoDoEmployee(e);
+  const mins = calcMinsTrabalhados(rec);
+  const faltam = Math.max(0, jornadaMin - mins);
+  document.getElementById('complementoResumo').textContent =
+    `${dateKey.split('-').reverse().join('/')} — trabalhou ${formatMinutes(mins)} de ${formatMinutes(jornadaMin)} esperados (jornada deste funcionário). Faltam ${formatMinutes(faltam)} pra completar.`;
+  document.getElementById('complementoOpcaoSaldo').checked = true;
+  document.getElementById('complementoHorasH').value = Math.floor(faltam/60);
+  document.getElementById('complementoHorasM').value = faltam%60;
+  document.getElementById('complementoMotivo').value = '';
+  toggleComplementoFields();
+  document.getElementById('complementoOverlay').classList.add('show');
+}
+async function saveComplemento(){
+  const dateKey = complementoDateKey;
+  if(!dateKey) return;
+  const opcao = complementoOpcaoSelecionada();
+  const motivo = document.getElementById('complementoMotivo').value.trim();
+  if(!motivo){ showToast('Informe o motivo, pra referência futura.'); return; }
+  const records = await fetchRecords(currentDetailUid);
+  const rec = records[dateKey];
+  if(!rec){ showToast('Esse dia não tem mais batida registrada.'); document.getElementById('complementoOverlay').classList.remove('show'); await renderMonth(); return; }
+  if(opcao==='saldo' || opcao==='negativo'){
+    const h = Math.max(0, Math.floor(Number(document.getElementById('complementoHorasH').value) || 0));
+    const m = Math.max(0, Math.min(59, Math.floor(Number(document.getElementById('complementoHorasM').value) || 0)));
+    const minutos = h*60 + m;
+    if(minutos<=0){ showToast('Informe quantos minutos serão usados pra completar.'); return; }
+    if(opcao==='saldo'){
+      const { saldoMins } = await calcSaldoHoraExtra(currentDetailUid);
+      if(minutos > saldoMins){
+        if(!confirm(`O saldo disponível é de ${formatMinutes(Math.max(0,saldoMins))}, menor que ${formatMinutes(minutos)} pedidos. Pra completar mesmo sem saldo suficiente, use a opção "deixar negativo". Continuar assim mesmo e deixar negativo?`)) return;
+      }
+    }
+    rec.complemento = { minutos, motivo, criadoEm: new Date().toISOString(), negativo: opcao==='negativo' };
+    delete rec.diaResolvido;
+  }else{
+    rec.diaResolvido = { motivo, quando: new Date().toISOString() };
+    delete rec.complemento;
+  }
+  records[dateKey] = rec;
+  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  if(ok){
+    showToast(opcao==='aceitar' ? 'Dia aceito como está.' : (opcao==='negativo' ? 'Jornada completada — saldo fica negativo.' : 'Jornada complementada com hora extra.'));
+    document.getElementById('complementoOverlay').classList.remove('show');
+    await Promise.all([renderMonth(), renderSaldoExtra()]);
+  }else showToast('Não foi possível salvar.');
+}
+
 function openDinheiroModal(){
   document.getElementById('dinheiroHorasH').value = '';
   document.getElementById('dinheiroHorasM').value = '';
@@ -1214,9 +1392,9 @@ function diasPendentesDoMes(records, mk){
   }
   return pendentes;
 }
-function renderPendenciasHtml(pendentes){
-  if(pendentes.length===0) return '';
-  return `<div class="card" style="border-color:var(--stamp-red); background:#fdf3f2; margin-bottom:16px; padding:16px;">
+function renderPendenciasHtml(pendentes, incompletos, jornadaMin){
+  if(pendentes.length===0 && incompletos.length===0) return '';
+  const semRegistroHtml = pendentes.length===0 ? '' : `
     <p style="font-weight:bold; color:var(--stamp-red); margin:0 0 4px;">⚠️ ${pendentes.length} dia(s) útil(eis) sem nenhum registro neste mês</p>
     <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px;">O funcionário não bateu ponto e ninguém decidiu ainda como resolver. Escolha uma ação pra cada dia — senão ele fica "no limbo" e pode ser esquecido na hora de fechar a folha.</p>
     ${pendentes.map(k=>{
@@ -1230,35 +1408,60 @@ function renderPendenciasHtml(pendentes){
           <button class="btn small outline" data-abonar="${k}" title="Dia dispensado, com direito a pagamento">Abonar</button>
         </div>
       </div>`;
-    }).join('')}
+    }).join('')}`;
+  const incompletosHtml = incompletos.length===0 ? '' : `
+    <p style="font-weight:bold; color:#8a5a00; margin:${pendentes.length>0?'16px':'0'} 0 4px;">⏳ ${incompletos.length} dia(s) com jornada incompleta</p>
+    <p style="font-size:12.5px; color:var(--muted); margin:0 0 10px;">Tem batida, mas fechou abaixo da jornada padrão deste funcionário (${formatMinutes(jornadaMin)}) e ainda não foi decidido se completa com hora extra ou desconta a diferença.</p>
+    ${incompletos.map(({key,mins,faltam})=>{
+      const [y,m,d] = key.split('-').map(Number);
+      const dow = DIAS_SEMANA_CURTO[new Date(y,m-1,d).getDay()];
+      return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 0; border-bottom:1px dashed var(--line);">
+        <div><b>${key.split('-').reverse().join('/')}</b> <span style="color:var(--muted); font-size:12px;">(${dow})</span> — trabalhou ${formatMinutes(mins)}, faltam ${formatMinutes(faltam)}</div>
+        <div class="row-actions">
+          <button class="btn small outline" data-completar-jornada="${key}" title="Completar a diferença com saldo de hora extra, ou aceitar como está">Resolver</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+  return `<div class="card" style="border-color:var(--stamp-red); background:#fdf3f2; margin-bottom:16px; padding:16px;">
+    ${semRegistroHtml}${incompletosHtml}
   </div>`;
+}
+function wirePendenciaButtons(wrap){
+  wrap.querySelectorAll('[data-marcar-falta]').forEach(btn=>{
+    btn.addEventListener('click', ()=> abrirAjusteFaltaRapido(btn.dataset.marcarFalta));
+  });
+  wrap.querySelectorAll('[data-abonar]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openAbonoModal(btn.dataset.abonar));
+  });
+  wrap.querySelectorAll('[data-complementar]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openFolgaModal(btn.dataset.complementar));
+  });
+  wrap.querySelectorAll('[data-completar-jornada]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openComplementoModal(btn.dataset.completarJornada));
+  });
 }
 async function renderMonth(){
   const wrap = document.getElementById('monthTableWrap');
   wrap.innerHTML = 'Carregando…';
   const records = await fetchRecords(currentDetailUid);
+  const empregado = employees.find(x=>x.uid===currentDetailUid);
+  const jornadaMin = jornadaPadraoDoEmployee(empregado);
   const pendentes = diasPendentesDoMes(records, viewMonth);
+  const incompletos = diasIncompletosDoMes(records, viewMonth, jornadaMin);
+  const totalPendencias = pendentes.length + incompletos.length;
   document.getElementById('monthLabel').innerHTML = esc(monthLabelOf(viewMonth)) +
-    (pendentes.length>0 ? ` <span class="tag demitido" title="Dias sem nenhum registro">${pendentes.length} pendente${pendentes.length>1?'s':''}</span>` : '');
-  const pendenciaHtml = renderPendenciasHtml(pendentes);
+    (totalPendencias>0 ? ` <span class="tag demitido" title="Dias sem registro ou com jornada incompleta">${totalPendencias} pendente${totalPendencias>1?'s':''}</span>` : '');
+  const pendenciaHtml = renderPendenciasHtml(pendentes, incompletos, jornadaMin);
   const dias = Object.keys(records).filter(k=>k.startsWith(viewMonth)).sort();
   if(dias.length===0){
     wrap.innerHTML = pendenciaHtml || '<p>Sem batidas neste mês.</p>';
-    wrap.querySelectorAll('[data-marcar-falta]').forEach(btn=>{
-      btn.addEventListener('click', ()=> abrirAjusteFaltaRapido(btn.dataset.marcarFalta));
-    });
-    wrap.querySelectorAll('[data-abonar]').forEach(btn=>{
-      btn.addEventListener('click', ()=> openAbonoModal(btn.dataset.abonar));
-    });
-    wrap.querySelectorAll('[data-complementar]').forEach(btn=>{
-      btn.addEventListener('click', ()=> openFolgaModal(btn.dataset.complementar));
-    });
+    wirePendenciaButtons(wrap);
     return;
   }
   let totalMins = 0;
   const linhas = dias.map(dateKey=>{
     const rec = records[dateKey];
-    let mins = 0, texto='';
+    let mins = 0, texto='', incompletoPendente = false;
     if(rec.falta){ texto = '<span style="color:var(--stamp-red);">FALTA</span> <span style="color:var(--muted); font-size:11px;">(desconta)</span>'; }
     else if(rec.abono){ texto = `ABONO${rec.abono.motivo?' — '+esc(rec.abono.motivo):''}`; }
     else if(rec.folga){ texto = `FOLGA (${formatMinutes(folgaMinutosConsumidos(rec.folga))})${rec.folga.motivo?' — '+esc(rec.folga.motivo):''}`; }
@@ -1266,10 +1469,22 @@ async function renderMonth(){
       const e=timeToMinutes(rec.entrada), s=timeToMinutes(rec.saida);
       if(e!==null && s!==null){ mins = Math.max(0,s-e); texto = formatMinutes(mins); }
     }else{
-      const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
-      if(e!==null&&as!==null) mins += (as-e);
-      if(av!==null&&s!==null) mins += (s-av);
-      texto = mins>0 ? formatMinutes(mins) : '(parcial)';
+      mins = calcMinsTrabalhados(rec);
+      if(rec.complemento){
+        const compMins = complementoMinutosConsumidos(rec.complemento);
+        const negTag = rec.complemento.negativo ? ' <b style="color:var(--stamp-red);">(saldo negativo)</b>' : '';
+        texto = `${formatMinutes(mins+compMins)} <span style="color:var(--muted); font-size:11px;">(${formatMinutes(mins)} batido + ${formatMinutes(compMins)} complemento c/ hora extra${negTag}${rec.complemento.motivo?' — '+esc(rec.complemento.motivo):''})</span>`;
+        mins += compMins;
+      }else if(mins>0 && mins < jornadaMin && isDiaUtil(dateKey)){
+        if(rec.diaResolvido){
+          texto = `${formatMinutes(mins)} <span style="color:#8a5a00; font-size:11px;">(incompleto — aceito: ${esc(rec.diaResolvido.motivo||'')})</span>`;
+        }else{
+          texto = `${formatMinutes(mins)} <span style="color:var(--stamp-red); font-size:11px;">(incompleto — pendente ⏳)</span>`;
+          incompletoPendente = true;
+        }
+      }else{
+        texto = mins>0 ? formatMinutes(mins) : '(parcial)';
+      }
     }
     totalMins += mins;
     const locLinks = TIPOS.filter(t=>rec[t+'Loc']).map(t=>{
@@ -1289,6 +1504,8 @@ async function renderMonth(){
           <button class="btn small outline" data-ajustar-dia="${dateKey}" title="Ajustar manualmente">✎</button>
           ${(rec.folga||rec.abono) ? `<button class="btn small outline" data-remover-dia="${dateKey}" title="Tirar folga/abono">✕</button>` : ''}
           ${rec.falta ? `<button class="btn small outline" data-complementar="${dateKey}" title="Trocar falta por complemento com hora extra">🔁</button><button class="btn small outline" data-abonar="${dateKey}" title="Trocar falta por abono">🗓️</button>` : ''}
+          ${incompletoPendente ? `<button class="btn small danger" data-completar-jornada="${dateKey}" title="Completar com hora extra ou aceitar como está">Resolver</button>` : ''}
+          ${rec.complemento ? `<button class="btn small outline" data-remover-complemento="${dateKey}" title="Remover complemento">✕</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -1302,15 +1519,10 @@ async function renderMonth(){
   wrap.querySelectorAll('[data-remover-dia]').forEach(btn=>{
     btn.addEventListener('click', ()=> removerFolgaOuAbono(btn.dataset.removerDia));
   });
-  wrap.querySelectorAll('[data-marcar-falta]').forEach(btn=>{
-    btn.addEventListener('click', ()=> abrirAjusteFaltaRapido(btn.dataset.marcarFalta));
+  wrap.querySelectorAll('[data-remover-complemento]').forEach(btn=>{
+    btn.addEventListener('click', ()=> removerComplemento(btn.dataset.removerComplemento));
   });
-  wrap.querySelectorAll('[data-abonar]').forEach(btn=>{
-    btn.addEventListener('click', ()=> openAbonoModal(btn.dataset.abonar));
-  });
-  wrap.querySelectorAll('[data-complementar]').forEach(btn=>{
-    btn.addEventListener('click', ()=> openFolgaModal(btn.dataset.complementar));
-  });
+  wirePendenciaButtons(wrap);
 }
 // Atalho pra "Descontar" na lista de pendências: já abre o modal de ajuste
 // manual com a data preenchida e a caixa "Marcar como falta" já marcada —
@@ -1350,6 +1562,7 @@ function openPayConfig(){
   const e = employees.find(x=>x.uid===currentDetailUid);
   const tipo = e.tipoPagamento === 'mensalista' ? 'clt' : (e.tipoPagamento || 'estagiario'); // 'mensalista' era o nome antigo do CLT
   document.getElementById('tipoPagamentoSelect').value = tipo;
+  document.getElementById('jornadaPadraoHoras').value = jornadaPadraoDoEmployee(e) / 60;
   document.getElementById('salarioMensal').value = e.salario || '';
   const dv = e.diariaValores || {};
   document.getElementById('valor4h').value = dv['4']||dv[4]||0;
@@ -1368,6 +1581,7 @@ function toggleTipoPagamentoFields(){
   const tipo = document.getElementById('tipoPagamentoSelect').value;
   document.getElementById('diaristaFields').style.display = tipo==='diarista' ? 'block' : 'none';
   document.getElementById('salarioFields').style.display = tipo==='diarista' ? 'none' : 'block';
+  document.getElementById('jornadaPadraoRow').style.display = tipo==='diarista' ? 'none' : 'block';
   document.getElementById('cltHint').style.display = tipo==='clt' ? 'block' : 'none';
 }
 function toggleVTFields(){
@@ -1378,6 +1592,7 @@ async function savePayConfig(){
   const vtAtivo = document.getElementById('vtAtivoCheck').checked;
   const fields = {
     tipoPagamento: tipo,
+    jornadaPadraoMin: Math.round((Number(document.getElementById('jornadaPadraoHoras').value) || 6) * 60),
     va: Number(document.getElementById('vaValorDia').value) || 0,
     vaForma: document.getElementById('vaFormaDinheiro').checked ? 'dinheiro' : 'cartao',
     vtAtivo,
@@ -1562,6 +1777,12 @@ on('abonoSave','click', saveAbono);
 on('converterFolgaBtn','click', openFolgaModal);
 on('folgaCancel','click', ()=>document.getElementById('folgaOverlay').classList.remove('show'));
 on('folgaSave','click', saveFolga);
+
+on('complementoCancel','click', ()=>document.getElementById('complementoOverlay').classList.remove('show'));
+on('complementoSave','click', saveComplemento);
+on('complementoOpcaoSaldo','change', toggleComplementoFields);
+on('complementoOpcaoNegativo','change', toggleComplementoFields);
+on('complementoOpcaoAceitar','change', toggleComplementoFields);
 
 on('pagarDinheiroBtn','click', openDinheiroModal);
 on('dinheiroCancel','click', ()=>document.getElementById('dinheiroOverlay').classList.remove('show'));
