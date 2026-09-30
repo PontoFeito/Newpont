@@ -3,9 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Painel ADM">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap">
 <title>Ponto Digital · Painel ADM</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
 :root{
   --bg:#F5F6F4; --paper:#FFFFFF; --paper-dark:#F2F2F2; --ink:#16191C;
   --muted:#6B7178; --line:#E3E4E0; --confirm-green:#2E7D5B; --stamp-red:#B4423F;
@@ -25,21 +32,21 @@ h1{font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.5
 input, select{width:100%; padding:11px 12px; border:1.5px solid var(--line); border-radius:var(--radius-sm); font-family:'Inter',sans-serif; font-size:14px; background:var(--paper); color:var(--ink); transition:border-color .15s, box-shadow .15s;}
 input:focus, select:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint);}
 .btn{border:none; background:var(--accent); color:#fff; border-radius:var(--radius-sm); padding:12px 18px; font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; cursor:pointer; font-size:14px; box-shadow:var(--shadow-sm); transition:background .15s, transform .1s, box-shadow .15s;}
-.btn:hover{background:var(--accent-dark); transform:translateY(-1px); box-shadow:var(--shadow-md);}
+@media (hover:hover){ .btn:hover{background:var(--accent-dark); transform:translateY(-1px); box-shadow:var(--shadow-md);} }
 .btn:active{transform:translateY(0);}
 .btn.outline{background:transparent; color:var(--accent); border:1.5px solid var(--accent); box-shadow:none;}
-.btn.outline:hover{background:var(--accent-tint); box-shadow:none;}
+@media (hover:hover){ .btn.outline:hover{background:var(--accent-tint); box-shadow:none;} }
 .btn.danger{background:var(--stamp-red);}
-.btn.danger:hover{background:#8f302d;}
+@media (hover:hover){ .btn.danger:hover{background:#8f302d;} }
 .btn.small{padding:7px 12px; font-size:11px; border-radius:7px;}
 .error-text{color:var(--stamp-red); font-size:13px; margin-top:8px; min-height:16px;}
 .link-btn{background:none; border:none; color:var(--accent); text-decoration:none; cursor:pointer; font-size:13px; padding:0;}
-.link-btn:hover{text-decoration:underline;}
+@media (hover:hover){ .link-btn:hover{text-decoration:underline;} }
 table{width:100%; border-collapse:collapse; font-size:13px;}
 th, td{border-bottom:1px solid var(--line); padding:10px 8px; text-align:left;}
 th{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--muted); letter-spacing:0.5px;}
 tbody tr{transition:background .12s;}
-tbody tr:hover{background:var(--accent-tint);}
+@media (hover:hover){ tbody tr:hover{background:var(--accent-tint);} }
 .tag{display:inline-block; padding:3px 10px; border-radius:20px; font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px;}
 .tag.ativo{background:var(--accent-tint); color:var(--confirm-green);}
 .tag.demitido{background:#faeaea; color:var(--stamp-red);}
@@ -52,9 +59,9 @@ tbody tr:hover{background:var(--accent-tint);}
 .modal{background:var(--paper); border-radius:18px; padding:24px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-md);}
 .month-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
 .month-nav button{border:1.5px solid var(--line); background:var(--paper); border-radius:var(--radius-sm); padding:5px 14px; cursor:pointer; transition:background .12s, border-color .12s;}
-.month-nav button:hover{background:var(--accent-tint); border-color:var(--accent);}
+@media (hover:hover){ .month-nav button:hover{background:var(--accent-tint); border-color:var(--accent);} }
 .back-link{cursor:pointer; color:var(--accent); font-family:'Space Mono',monospace; font-size:12px; text-decoration:none;}
-.back-link:hover{text-decoration:underline;}
+@media (hover:hover){ .back-link:hover{text-decoration:underline;} }
 
 .header-row{display:flex; align-items:center; gap:14px; margin-bottom:22px; padding-bottom:18px;}
 .menu-btn{
@@ -62,7 +69,7 @@ tbody tr:hover{background:var(--accent-tint);}
   width:42px; height:42px; font-size:18px; cursor:pointer; flex-shrink:0; box-shadow:var(--shadow-sm);
   transition:background .12s, border-color .12s;
 }
-.menu-btn:hover{background:var(--accent-tint); border-color:var(--accent);}
+@media (hover:hover){ .menu-btn:hover{background:var(--accent-tint); border-color:var(--accent);} }
 .drawer-overlay{
   position:fixed; inset:0; background:rgba(15,20,18,.55);
   display:none; z-index:90;
@@ -81,7 +88,7 @@ tbody tr:hover{background:var(--accent-tint);}
 }
 .drawer-header h2{margin:0; font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase;}
 .drawer-close{border:1.5px solid var(--line); background:var(--paper); border-radius:var(--radius-sm); width:34px; height:34px; font-size:16px; cursor:pointer; transition:background .12s;}
-.drawer-close:hover{background:var(--accent-tint);}
+@media (hover:hover){ .drawer-close:hover{background:var(--accent-tint);} }
 .drawer-body{flex:1; overflow-y:auto; padding:8px 0;}
 .drawer-account{padding:14px 16px; border-bottom:1px solid var(--line); background:var(--paper);}
 .drawer-account .acc-label{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; color:var(--muted); letter-spacing:1px;}
@@ -92,11 +99,65 @@ tbody tr:hover{background:var(--accent-tint);}
   font-family:'Inter',sans-serif; font-size:14.5px; color:var(--ink);
   cursor:pointer; transition:background .12s;
 }
-.drawer-item:hover, .drawer-item:active{background:var(--accent-tint);}
+.drawer-item:active{background:var(--accent-tint);}
+@media (hover:hover){ .drawer-item:hover{background:var(--accent-tint);} }
 .drawer-item .ic{width:20px; text-align:center; flex-shrink:0;}
 .drawer-item.danger{color:var(--stamp-red);}
-.drawer-item.danger:hover{background:#faeaea;}
+@media (hover:hover){ .drawer-item.danger:hover{background:#faeaea;} }
 .drawer-footer{border-top:1px solid var(--line); padding:8px; background:var(--paper);}
+
+
+/* ================= iPhone / toque =================
+   O que travava o uso no iOS Safari:
+   - campo com fonte menor que 16px faz o iOS dar zoom ao tocar e a tela fica deslocada;
+   - modal mais alto que a tela não rolava e escondia os botões;
+   - botões menores que 44px, tabelas largas demais e :hover que "gruda" depois do toque;
+   - a página de trás rolava junto com o modal aberto. */
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
+html.modal-aberto, html.modal-aberto body{overflow:hidden;}
+body{min-height:100vh; min-height:100dvh; -webkit-tap-highlight-color:transparent;}
+button, select, label, summary, [role="button"]{touch-action:manipulation;}
+input, select, textarea{font-size:16px !important; min-width:0; max-width:100%;}
+input[type="checkbox"], input[type="radio"]{width:22px !important; height:22px; flex-shrink:0; accent-color:var(--accent);}
+textarea{width:100%; padding:11px 12px; border:1.5px solid var(--line); border-radius:var(--radius-sm); font-family:'Inter',sans-serif; background:var(--paper); color:var(--ink); resize:vertical; transition:border-color .15s, box-shadow .15s;}
+textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint);}
+.modal-overlay{overscroll-behavior:contain;}
+.modal{max-height:100% !important; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+/* botões Salvar/Cancelar sempre à vista nos modais altos (o conteúdo rola por baixo) */
+.modal > div:last-child{position:sticky; bottom:-24px; background:var(--paper); padding:12px 0 14px;}
+.hint-text{font-size:13px; line-height:1.4; color:var(--muted); margin:0 0 12px;} /* a classe já era usada no HTML, mas sem estilo */
+.drawer-body{-webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+.table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+.month-summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:0 0 12px;}
+.month-summary > div{background:var(--paper-dark); border:1px solid var(--line); border-radius:var(--radius-sm); padding:8px 12px; display:flex; flex-direction:column; gap:2px;}
+.month-summary span{font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted);}
+.month-summary b{font-family:'Space Mono',monospace; font-size:16px;}
+.month-summary small{font-size:11px; color:var(--muted);}
+@media (max-width:640px){
+  body{padding:16px 12px 40px;}
+  .card{padding:16px 14px;}
+  .stack-mobile thead{display:none;}
+  .stack-mobile, .stack-mobile tbody, .stack-mobile tr, .stack-mobile td{display:block; width:100%;}
+  .stack-mobile tr{border:1px solid var(--line); border-radius:12px; padding:8px 12px; margin-bottom:10px; background:var(--paper); box-shadow:var(--shadow-sm);}
+  .stack-mobile td{border:none; padding:5px 0; display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:right;}
+  .stack-mobile td::before{content:attr(data-label); font-family:'Space Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); text-align:left; flex-shrink:0;}
+  .stack-mobile td:first-child{font-weight:700; font-size:14px; padding-bottom:6px; margin-bottom:4px; border-bottom:1px dashed var(--line);}
+  .stack-mobile td.col-acao{justify-content:flex-start; padding-top:8px;}
+  .stack-mobile td.col-acao::before{content:none;}
+  .stack-mobile tbody tr:hover{background:var(--paper);}
+}
+@media (pointer:coarse){
+  .btn{min-height:46px;}
+  .btn.small{min-height:44px; min-width:44px; padding:10px 14px; font-size:12px;}
+  .menu-btn{width:46px; height:46px;}
+  .drawer-close{width:44px; height:44px;}
+  .month-nav button{min-width:52px; min-height:44px;}
+  .drawer-item{min-height:48px;}
+  .link-btn, .back-link{display:inline-flex; align-items:center; min-height:44px;}
+  summary{display:flex; align-items:center; min-height:44px;}
+  input:not([type="checkbox"]):not([type="radio"]), select{min-height:46px;}
+}
+
 </style>
 </head>
 <body>
@@ -183,12 +244,12 @@ tbody tr:hover{background:var(--accent-tint);}
       </div>
       <div class="field-row">
         <label for="newIdentifier" id="newIdentifierLabel">E-mail</label>
-        <input type="text" id="newIdentifier" placeholder="pessoa@email.com">
+        <input type="text" id="newIdentifier" placeholder="pessoa@email.com" autocapitalize="none" autocorrect="off" spellcheck="false">
       </div>
       <div class="field-row">
         <label for="newSenha">Senha inicial</label>
         <div style="display:flex; gap:6px;">
-          <input type="text" id="newSenha" placeholder="mín. 6 caracteres">
+          <input type="text" id="newSenha" placeholder="mín. 6 caracteres" autocapitalize="none" autocorrect="off" spellcheck="false">
           <button class="btn outline small" id="gerarSenhaBtn" type="button">Gerar</button>
         </div>
       </div>
@@ -447,6 +508,7 @@ tbody tr:hover{background:var(--accent-tint);}
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="ponto-core.js"></script>
 <script>
 // Mesmo projeto Firebase do app de ponto — mesmo banco de dados.
 const firebaseConfig = {
@@ -858,12 +920,12 @@ async function recuperarUidExistente(){
 function renderEmployeesTable(){
   const wrap = document.getElementById('employeesTableWrap');
   if(employees.length === 0){ wrap.innerHTML = '<p>Nenhum funcionário cadastrado ainda.</p>'; return; }
-  wrap.innerHTML = `<div style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Status</th><th>Pagamento</th><th></th></tr></thead><tbody>
+  wrap.innerHTML = `<div class="table-scroll"><table class="stack-mobile"><thead><tr><th>Nome</th><th>Status</th><th>Pagamento</th><th></th></tr></thead><tbody>
     ${employees.map(e=>`<tr>
-      <td>${esc(e.nome||'—')}</td>
-      <td><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span></td>
-      <td>${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}</td>
-      <td><button class="btn small outline" data-uid="${esc(e.uid)}">Ver</button></td>
+      <td data-label="Nome">${esc(e.nome||'—')}</td>
+      <td data-label="Status"><span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span></td>
+      <td data-label="Pagamento">${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}</td>
+      <td class="col-acao"><button class="btn small outline" data-uid="${esc(e.uid)}">Ver</button></td>
     </tr>`).join('')}
   </tbody></table></div>`;
   wrap.querySelectorAll('button[data-uid]').forEach(btn=>{
@@ -898,7 +960,7 @@ async function openDetail(uid){
   document.getElementById('detailNome').textContent = e.nome || '—';
   document.getElementById('detailStatusTag').innerHTML = `<span class="tag ${e.status==='demitido'?'demitido':'ativo'}">${esc(e.status||'ativo')}</span> · ${e.tipoPagamento==='diarista'?'Diarista':(e.tipoPagamento==='clt'||e.tipoPagamento==='mensalista'?'CLT':'Estagiário')}`;
   document.getElementById('detailContaInfo').innerHTML = `Identificação: ${esc(e.identifier||'—')}<br>UID: ${esc(e.uid)}`;
-  viewMonth = new Date().toISOString().slice(0,7);
+  viewMonth = PontoCore.currentMonthKey(); // data local, igual ao app do funcionário (toISOString() é UTC e vira o mês/dia antes da hora)
   await Promise.all([renderMonth(), renderSaldoExtra()]);
 }
 function backToList(){
@@ -915,8 +977,10 @@ function monthLabelOf(mk){
   const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   return `${meses[+m-1]} de ${y}`;
 }
-function timeToMinutes(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
-function formatMinutes(mins){ mins = Math.round(mins || 0); const h=Math.floor(mins/60); const mm=mins%60; return `${h}h${pad(mm)}`; }
+// Toda a conta de horas/hora extra mora em ponto-core.js — a MESMA do app do
+// funcionário e da folha de pagamentos. Não recalcule nada disso aqui.
+const timeToMinutes = PontoCore.timeToMinutes;
+const formatMinutes = PontoCore.formatMinutes;
 
 async function fetchRecords(uid){
   const token = await authToken();
@@ -945,99 +1009,23 @@ async function fetchExtrasPagos(uid){
   const raw = data.fields && data.fields.value && data.fields.value.stringValue;
   try{ return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
 }
-// Calcula, a partir dos pontos batidos, quanto de hora extra ainda não foi
-// usado (nem virado folga, nem pago em dinheiro) — mesma lógica de fim de
-// semana e diarista do app do funcionário, simplificada aqui.
-// jornadaMin: jornada diária padrão daquele funcionário, em minutos —
-// acima disso vira hora extra. É configurável por funcionário (CLT pode
-// ter jornada diferente de estagiário/diarista), por isso é sempre
-// passada como parâmetro em vez de fixa.
-function calcExtraMinsDoRegistro(rec, key, jornadaMin){
-  if(!rec || rec.falta || rec.abono || rec.folga) return 0;
-  let fimDeSemana = false;
-  if(key){
-    const [y,m,d] = key.split('-').map(Number);
-    const dow = new Date(y, m-1, d).getDay();
-    fimDeSemana = (dow===0 || dow===6);
-  }
-  if(rec.diarista){
-    const e=timeToMinutes(rec.entrada), s=timeToMinutes(rec.saida);
-    if(e===null||s===null) return 0;
-    const mins = Math.max(0, s-e);
-    return fimDeSemana ? mins : 0;
-  }
-  const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
-  let mins = 0;
-  if(e!==null && as!==null) mins += (as-e);
-  if(av!==null && s!==null) mins += (s-av);
-  if(mins<=0) return 0;
-  return fimDeSemana ? mins : (mins > jornadaMin ? mins - jornadaMin : 0);
-}
-// Lê o consumo de saldo em minutos, aceitando tanto o formato novo
-// (minutos inteiros) quanto o antigo (horas em decimal, de versões
-// anteriores) — sempre arredondado, pra nunca gerar dízima.
-function folgaMinutosConsumidos(folga){
-  if(!folga) return 0;
-  if(folga.minutosConvertidos!=null) return Math.round(Number(folga.minutosConvertidos)||0);
-  return Math.round((Number(folga.horasConvertidas)||0)*60);
-}
-// Jornada padrão em minutos — mesmo limite usado no app do funcionário pra
-// separar hora normal de hora extra. Cada funcionário pode ter a sua
-// (campo "jornadaPadraoMin" no cadastro); se não estiver configurada,
-// cai no padrão histórico de 6h.
-const JORNADA_PADRAO_MIN_DEFAULT = 6*60;
-function jornadaPadraoDoEmployee(e){
-  const v = e && e.jornadaPadraoMin;
-  return (v && v>0) ? v : JORNADA_PADRAO_MIN_DEFAULT;
-}
-function calcMinsTrabalhados(rec){
-  if(!rec) return 0;
-  const e=timeToMinutes(rec.entrada), as=timeToMinutes(rec.almocoSaida), av=timeToMinutes(rec.almocoVolta), s=timeToMinutes(rec.saida);
-  let mins = 0;
-  if(e!==null && as!==null) mins += (as-e);
-  if(av!==null && s!==null) mins += (s-av);
-  return mins;
-}
-function complementoMinutosConsumidos(c){
-  if(!c) return 0;
-  return Math.round(Number(c.minutos)||0);
-}
-function isDiaUtil(dateKey){
-  const [y,m,d] = dateKey.split('-').map(Number);
-  const dow = new Date(y, m-1, d).getDay();
-  return dow>=1 && dow<=5;
-}
-// Dias úteis (seg-sex) do mês que têm batida real, mas somam menos que a
-// jornada padrão daquele funcionário, e ainda não foram resolvidos (nem
-// complementados, nem aceitos assim mesmo pelo admin).
-function diasIncompletosDoMes(records, mk, jornadaMin){
-  const incompletos = [];
-  Object.keys(records).filter(k=>k.startsWith(mk)).forEach(k=>{
-    const rec = records[k];
-    if(!rec || rec.falta || rec.abono || rec.folga || rec.diarista || rec.complemento || rec.diaResolvido) return;
-    if(!isDiaUtil(k)) return; // fim de semana não segue a jornada padrão
-    const mins = calcMinsTrabalhados(rec);
-    if(mins>0 && mins < jornadaMin){
-      incompletos.push({key:k, mins, faltam: jornadaMin - mins});
-    }
-  });
-  return incompletos.sort((a,b)=>a.key.localeCompare(b.key));
-}
-function extraMinutosConsumidos(x){
-  if(x.minutos!=null) return Math.round(Number(x.minutos)||0);
-  return Math.round((Number(x.horas)||0)*60);
-}
+// Jornada diária padrão do funcionário (campo "jornadaPadraoMin" no cadastro;
+// padrão 6h). Acima disso, em dia útil, o que foi batido vira hora extra.
+const jornadaPadraoDoEmployee = PontoCore.jornadaPadraoDoEmployee;
+const calcMinsTrabalhados = rec => PontoCore.minutosBatidos(rec).mins;
+const folgaMinutosConsumidos = PontoCore.folgaMinutosConsumidos;
+const complementoMinutosConsumidos = PontoCore.complementoMinutosConsumidos;
+const extraMinutosConsumidos = PontoCore.extraMinutosConsumidos;
+const isDiaUtil = PontoCore.isDiaUtil;
+const diasIncompletosDoMes = PontoCore.diasIncompletosDoMes;
+// Saldo de hora extra = extra gerada − folgas − complementos de jornada −
+// extras pagas em dinheiro. É exatamente o mesmo número que o funcionário vê
+// no fechamento do mês dele.
 async function calcSaldoHoraExtra(uid){
   const [records, extras] = await Promise.all([fetchRecords(uid), fetchExtrasPagos(uid)]);
   const e = employees.find(x=>x.uid===uid);
-  const jornadaMin = jornadaPadraoDoEmployee(e);
-  let totalExtraMins = 0;
-  Object.keys(records).forEach(k=>{ totalExtraMins += Math.round(calcExtraMinsDoRegistro(records[k], k, jornadaMin)); });
-  let usadoMins = 0;
-  Object.keys(records).forEach(k=>{ usadoMins += folgaMinutosConsumidos(records[k].folga); });
-  Object.keys(records).forEach(k=>{ usadoMins += complementoMinutosConsumidos(records[k].complemento); });
-  extras.forEach(x=>{ usadoMins += extraMinutosConsumidos(x); });
-  return { saldoMins: Math.round(totalExtraMins - usadoMins), totalExtraMins, usadoMins, records, extras };
+  const saldo = PontoCore.saldoHoraExtra(records, extras, e);
+  return Object.assign({ records, extras }, saldo);
 }
 
 // --- banco de horas extras: abono, folga, pagamento em dinheiro ---
@@ -1046,8 +1034,9 @@ async function renderSaldoExtra(){
   const wrap = document.getElementById('historicoAjustesWrap');
   label.textContent = 'Calculando saldo…';
   wrap.innerHTML = '';
-  const { saldoMins, records, extras } = await calcSaldoHoraExtra(currentDetailUid);
-  label.innerHTML = `Saldo disponível: <b>${formatMinutes(Math.max(0,saldoMins))}</b>` + (saldoMins<0 ? ` <span style="color:var(--stamp-red);">(negativo: ${formatMinutes(-saldoMins)})</span>` : '');
+  const { saldoMins, records, extras, totalExtraMins, folgaMins, complementoMins, pagoMins } = await calcSaldoHoraExtra(currentDetailUid);
+  label.innerHTML = `Saldo disponível: <b>${formatMinutes(Math.max(0,saldoMins))}</b>` + (saldoMins<0 ? ` <span style="color:var(--stamp-red);">(negativo: ${formatMinutes(-saldoMins)})</span>` : '') +
+    `<div style="font-family:'Inter',sans-serif; font-size:12px; color:var(--muted); margin-top:6px;">Gerada ${formatMinutes(totalExtraMins)} − folgas ${formatMinutes(folgaMins)} − complementos ${formatMinutes(complementoMins)} − pagas em dinheiro ${formatMinutes(pagoMins)}. É o mesmo saldo que o funcionário vê no app dele.</div>`;
 
   const itens = [];
   Object.keys(records).filter(k=>records[k].abono).forEach(k=>{
@@ -1348,7 +1337,7 @@ function openDinheiroModal(){
   document.getElementById('dinheiroHorasM').value = '';
   document.getElementById('dinheiroValor').value = '';
   document.getElementById('dinheiroMotivo').value = '';
-  document.getElementById('dinheiroMes').value = new Date().toISOString().slice(0,7);
+  document.getElementById('dinheiroMes').value = PontoCore.currentMonthKey();
   document.getElementById('dinheiroOverlay').classList.add('show');
 }
 async function saveDinheiro(){
@@ -1381,7 +1370,7 @@ const DIAS_SEMANA_CURTO = ['dom','seg','ter','qua','qui','sex','sáb'];
 function diasPendentesDoMes(records, mk){
   const [y,m] = mk.split('-').map(Number);
   const diasNoMes = new Date(y, m, 0).getDate();
-  const hojeKey = new Date().toISOString().slice(0,10);
+  const hojeKey = PontoCore.todayKey();
   const pendentes = [];
   for(let d=1; d<=diasNoMes; d++){
     const key = `${y}-${pad(m)}-${pad(d)}`;
@@ -1443,7 +1432,7 @@ function wirePendenciaButtons(wrap){
 async function renderMonth(){
   const wrap = document.getElementById('monthTableWrap');
   wrap.innerHTML = 'Carregando…';
-  const records = await fetchRecords(currentDetailUid);
+  const [records, extrasPagos] = await Promise.all([fetchRecords(currentDetailUid), fetchExtrasPagos(currentDetailUid)]);
   const empregado = employees.find(x=>x.uid===currentDetailUid);
   const jornadaMin = jornadaPadraoDoEmployee(empregado);
   const pendentes = diasPendentesDoMes(records, viewMonth);
@@ -1458,10 +1447,11 @@ async function renderMonth(){
     wirePendenciaButtons(wrap);
     return;
   }
-  let totalMins = 0;
   const linhas = dias.map(dateKey=>{
     const rec = records[dateKey];
     let mins = 0, texto='', incompletoPendente = false;
+    const calc = PontoCore.calcDia(rec, dateKey, empregado); // mesma conta do app do funcionário
+    const extraDia = calc && !calc.falta ? calc.extraMins : 0;
     if(rec.falta){ texto = '<span style="color:var(--stamp-red);">FALTA</span> <span style="color:var(--muted); font-size:11px;">(desconta)</span>'; }
     else if(rec.abono){ texto = `ABONO${rec.abono.motivo?' — '+esc(rec.abono.motivo):''}`; }
     else if(rec.folga){ texto = `FOLGA (${formatMinutes(folgaMinutosConsumidos(rec.folga))})${rec.folga.motivo?' — '+esc(rec.folga.motivo):''}`; }
@@ -1474,7 +1464,6 @@ async function renderMonth(){
         const compMins = complementoMinutosConsumidos(rec.complemento);
         const negTag = rec.complemento.negativo ? ' <b style="color:var(--stamp-red);">(saldo negativo)</b>' : '';
         texto = `${formatMinutes(mins+compMins)} <span style="color:var(--muted); font-size:11px;">(${formatMinutes(mins)} batido + ${formatMinutes(compMins)} complemento c/ hora extra${negTag}${rec.complemento.motivo?' — '+esc(rec.complemento.motivo):''})</span>`;
-        mins += compMins;
       }else if(mins>0 && mins < jornadaMin && isDiaUtil(dateKey)){
         if(rec.diaResolvido){
           texto = `${formatMinutes(mins)} <span style="color:#8a5a00; font-size:11px;">(incompleto — aceito: ${esc(rec.diaResolvido.motivo||'')})</span>`;
@@ -1486,20 +1475,20 @@ async function renderMonth(){
         texto = mins>0 ? formatMinutes(mins) : '(parcial)';
       }
     }
-    totalMins += mins;
     const locLinks = TIPOS.filter(t=>rec[t+'Loc']).map(t=>{
       const l = rec[t+'Loc'];
       return `<a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">${LABELS[t]}📍</a>`;
     }).join(' ');
     return `<tr>
-      <td>${dateKey.split('-').reverse().join('/')}${rec.pendingRequest?' ⏳':''}</td>
-      <td>${rec.entrada||'—'}</td>
-      <td>${rec.almocoSaida||(rec.diarista?'—(diarista)':'—')}</td>
-      <td>${rec.almocoVolta||(rec.diarista?'—(diarista)':'—')}</td>
-      <td>${rec.saida||'—'}</td>
-      <td>${texto}</td>
-      <td>${locLinks||'—'}</td>
-      <td>
+      <td data-label="Data">${dateKey.split('-').reverse().join('/')}${rec.pendingRequest?' ⏳':''}</td>
+      <td data-label="Entrada">${rec.entrada||'—'}</td>
+      <td data-label="S. Almoço">${rec.almocoSaida||(rec.diarista?'—(diarista)':'—')}</td>
+      <td data-label="V. Almoço">${rec.almocoVolta||(rec.diarista?'—(diarista)':'—')}</td>
+      <td data-label="Saída">${rec.saida||'—'}</td>
+      <td data-label="Total">${texto}</td>
+      <td data-label="Extra">${extraDia>0 ? `<span style="color:var(--stamp-red); font-weight:600;">${formatMinutes(extraDia)}</span>` : '—'}</td>
+      <td data-label="Local">${locLinks||'—'}</td>
+      <td class="col-acao">
         <div style="display:flex; gap:4px; flex-wrap:wrap;">
           <button class="btn small outline" data-ajustar-dia="${dateKey}" title="Ajustar manualmente">✎</button>
           ${(rec.folga||rec.abono) ? `<button class="btn small outline" data-remover-dia="${dateKey}" title="Tirar folga/abono">✕</button>` : ''}
@@ -1510,8 +1499,15 @@ async function renderMonth(){
       </td>
     </tr>`;
   }).join('');
-  wrap.innerHTML = pendenciaHtml + `<p><strong>Total do mês:</strong> ${formatMinutes(totalMins)}</p>
-    <div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Entrada</th><th>S.Almoço</th><th>V.Almoço</th><th>Saída</th><th>Total</th><th>Local</th><th>Ações</th></tr></thead>
+  const resumo = PontoCore.resumoHorasMes(records, viewMonth, empregado, extrasPagos);
+  const ehDiarista = empregado && empregado.tipoPagamento==='diarista';
+  wrap.innerHTML = pendenciaHtml + `<div class="month-summary">
+      <div><span>Total do mês</span><b>${formatMinutes(resumo.totalMesMins)}</b>${resumo.complementoMesMins>0 ? `<small>inclui ${formatMinutes(resumo.complementoMesMins)} de complemento</small>` : ''}</div>
+      <div><span>Hora extra gerada</span><b style="color:${resumo.extraMesMins>0?'var(--stamp-red)':'inherit'};">${formatMinutes(resumo.extraMesMins)}</b></div>
+      ${ehDiarista ? '' : `<div><span>Horas faltantes</span><b>${formatMinutes(resumo.horasFaltantesMin)}</b><small>jornada ${formatMinutes(resumo.jornadaMin)} × ${resumo.diasUteis} dias úteis</small></div>`}
+      ${resumo.extrasPagasValor>0 ? `<div><span>Extra paga em dinheiro</span><b>${formatMinutes(resumo.extrasPagasMins)}</b><small>${formatBRL(resumo.extrasPagasValor)}</small></div>` : ''}
+    </div>
+    <div class="table-scroll"><table class="stack-mobile"><thead><tr><th>Data</th><th>Entrada</th><th>S.Almoço</th><th>V.Almoço</th><th>Saída</th><th>Total</th><th>Extra</th><th>Local</th><th>Ações</th></tr></thead>
     <tbody>${linhas}</tbody></table></div>`;
   wrap.querySelectorAll('[data-ajustar-dia]').forEach(btn=>{
     btn.addEventListener('click', ()=> openAjusteManualModal(btn.dataset.ajustarDia));
@@ -1792,6 +1788,19 @@ on('tipoPagamentoSelect','change', toggleTipoPagamentoFields);
 on('vtAtivoCheck','change', toggleVTFields);
 on('prevMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,-1); renderMonth(); });
 on('nextMonthBtn','click', ()=>{ viewMonth = shiftMonth(viewMonth,1); renderMonth(); });
+</script>
+<script>
+// Enquanto um modal/menu/tela cheia está aberto, trava a rolagem da página de
+// trás (no iPhone o fundo rolava junto e o modal "fugia" do dedo).
+(function(){
+  var SEL = '.modal-overlay.show, .drawer-overlay.show, .fullscreen-overlay.show';
+  function sync(){ document.documentElement.classList.toggle('modal-aberto', !!document.querySelector(SEL)); }
+  var mo = new MutationObserver(sync);
+  document.querySelectorAll('.modal-overlay, .drawer-overlay, .fullscreen-overlay').forEach(function(el){
+    mo.observe(el, { attributes:true, attributeFilter:['class'] });
+  });
+  sync();
+})();
 </script>
 </body>
 </html>
