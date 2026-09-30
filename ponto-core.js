@@ -27,6 +27,13 @@
  *     saldo. Conta como hora trabalhada naquele dia e sai do saldo — mas
  *     nunca gera hora extra por si só;
  *   - saldo = extra gerada − folgas − complementos − extras pagas em dinheiro.
+ *
+ * Gravação segura de ponto-records (gravarRecordsComMerge): o app do
+ * funcionário e o ADM gravam o objeto INTEIRO dos pontos. Sem cuidado, quem
+ * grava por último apaga a mudança do outro (ex.: o ADM abona um dia enquanto
+ * o funcionário bate o ponto). Por isso a gravação relê o que está no servidor,
+ * aplica por cima só os dias que ESTE lado mexeu e grava com a "versão" lida —
+ * se alguém gravou no meio, o servidor recusa e o ciclo recomeça.
  */
 (function(root, factory){
   if(typeof module === 'object' && module.exports) module.exports = factory();
@@ -215,8 +222,68 @@
     };
   }
 
+  // --- gravação segura (ver comentário no topo) ---
+  function igual(a, b){ return JSON.stringify(ordenar(a)) === JSON.stringify(ordenar(b)); }
+  function ordenar(v){
+    if(Array.isArray(v)) return v.map(ordenar);
+    if(v && typeof v === 'object'){
+      const o = {}; Object.keys(v).sort().forEach(k=>{ o[k] = ordenar(v[k]); }); return o;
+    }
+    return v;
+  }
+  function clonar(v){ return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+
+  // Aplica em `latest` (o que está no servidor agora) só os dias que mudaram
+  // entre `base` (o que este lado tinha lido) e `mine` (o que este lado quer
+  // gravar). Dia que este lado não mexeu fica exatamente como o servidor tem.
+  function mesclarRecordsPorDia(base, mine, latest){
+    const out = clonar(latest || {});
+    const dias = new Set([...Object.keys(base || {}), ...Object.keys(mine || {})]);
+    dias.forEach(k=>{
+      const b = base ? base[k] : undefined, m = mine ? mine[k] : undefined;
+      if(igual(b, m)) return;                      // este lado não mexeu nesse dia
+      if(m === undefined) delete out[k]; else out[k] = clonar(m);
+    });
+    return out;
+  }
+
+  // Resposta de erro do Firestore numa gravação com precondição:
+  //  - conflito: alguém gravou depois da leitura (ou apagou o documento) -> reler e mesclar;
+  //  - semPrecondicao: o servidor recusou o próprio parâmetro (400 que não é
+  //    conflito) -> grava como antes, sem precondição (nunca pior que antes);
+  //  - qualquer outra coisa (401/403/429/5xx...) é erro de verdade.
+  function classificarFalhaDeEscrita(httpStatus, statusFirestore, temPrecondicao){
+    const st = String(statusFirestore || '');
+    const conflito = !!temPrecondicao && (httpStatus === 409 || httpStatus === 412 || httpStatus === 404 ||
+      st === 'FAILED_PRECONDITION' || st === 'ABORTED' || st === 'ALREADY_EXISTS' || st === 'NOT_FOUND');
+    const semPrecondicao = !!temPrecondicao && !conflito && httpStatus === 400;
+    return { conflito, semPrecondicao };
+  }
+
+  // ler()            -> { ok, records, version }   (version = marca do documento lido)
+  // escrever(obj, v) -> { ok, conflito, erro }     (conflito = alguém gravou depois da leitura)
+  // Se a releitura falhar, grava como antes (sem mesclar) — nunca fica pior
+  // do que era.
+  async function gravarRecordsComMerge(opts){
+    const { base, mine, ler, escrever } = opts;
+    const max = opts.tentativas || 4;
+    for(let i=0; i<max; i++){
+      const remoto = await ler();
+      if(!remoto || !remoto.ok){
+        const r = await escrever(clonar(mine), undefined);
+        return r.ok ? { ok:true, merged:clonar(mine) } : { ok:false, motivo:'escrita', erro:r.erro };
+      }
+      const merged = mesclarRecordsPorDia(base, mine, remoto.records);
+      const r = await escrever(merged, remoto.version);
+      if(r.ok) return { ok:true, merged, mesclou: !igual(merged, mine) };
+      if(!r.conflito) return { ok:false, motivo:'escrita', erro:r.erro };
+    }
+    return { ok:false, motivo:'conflito' };
+  }
+
   return {
     JORNADA_PADRAO_MIN_DEFAULT,
+    mesclarRecordsPorDia, gravarRecordsComMerge, classificarFalhaDeEscrita,
     pad, dateKeyOf, todayKey, currentMonthKey, monthKeyOf, shiftMonth,
     isFimDeSemana, isDiaUtil, diasUteisNoMes,
     timeToMinutes, formatMinutes, jornadaPadraoDoEmployee, minutosBatidos,

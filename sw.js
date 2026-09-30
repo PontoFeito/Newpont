@@ -1,4 +1,4 @@
-const CACHE_NAME = 'controle-ponto-v5';
+const CACHE_NAME = 'controle-ponto-v6';
 const ASSETS = [
   './controle_de_ponto.html',
   './ponto-core.js',

@@ -1169,6 +1169,7 @@ function withTimeout(promise, ms){
 const FIRESTORE_REST_BASE = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/default/documents`;
 
 async function storageGet(key){
+  lastStorageError = null; // depois da chamada, != null significa que ESTA leitura falhou
   const uid = currentUid();
   if(!uid) return null;
   try{
@@ -1429,7 +1430,7 @@ function writeCache(key, value){
 }
 function hydrateFromCache(){
   try{
-    const r = readCache(STORAGE_KEY); if(r) records = JSON.parse(r);
+    const r = readCache(STORAGE_KEY); if(r){ records = JSON.parse(r); snapshotRecordsBase(); }
     const s = readCache(SECURITY_KEY); if(s) security = JSON.parse(s);
     const pr = readCache(PROFILE_KEY); if(pr) profile = JSON.parse(pr);
   }catch(e){
@@ -1437,18 +1438,88 @@ function hydrateFromCache(){
   }
 }
 
+// --- pontos: leitura e gravação seguras ---
+// O ADM também grava neste mesmo documento (abono, folga, aprovação de ajuste).
+// Gravar o objeto inteiro "às cegas" apagava o que ele tinha acabado de fazer.
+// Por isso: guardamos o que o servidor tinha na última leitura (recordsBase),
+// e ao gravar relemos o servidor, aplicamos por cima só os dias que ESTE app
+// mexeu e gravamos com a versão lida (ponto-core.js: gravarRecordsComMerge).
+let recordsBase = {};
+function snapshotRecordsBase(){ recordsBase = JSON.parse(JSON.stringify(records)); }
+
 async function loadRecords(){
   try{
     const res = await storageGet(STORAGE_KEY);
+    // Falha de leitura (rede, timeout, erro do servidor) NÃO é "sem registros":
+    // antes a lista era zerada e o próximo ponto batido gravava só o dia de hoje
+    // por cima de todo o histórico. Agora mantém o que já estava na tela.
+    if(!res && lastStorageError) return;
     records = res && res.value ? JSON.parse(res.value) : {};
   }catch(e){
-    records = {};
+    return; // JSON ilegível: mantém o que já estava na tela
+  }
+  snapshotRecordsBase();
+}
+async function lerRecordsRemoto(){
+  const uid = currentUid();
+  if(!uid) return { ok:false };
+  try{
+    const token = await auth.currentUser.getIdToken();
+    const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(STORAGE_KEY)}`;
+    const {v:res, timedOut} = await withTimeout(fetch(url, { headers:{ Authorization:`Bearer ${token}` } }), 12000);
+    if(timedOut) return { ok:false };
+    if(res.status === 404) return { ok:true, records:{}, version:null }; // ainda não existe
+    if(!res.ok) return { ok:false };
+    const data = await res.json();
+    const raw = data.fields && data.fields.value && data.fields.value.stringValue;
+    return { ok:true, records: raw ? JSON.parse(raw) : {}, version: data.updateTime || undefined };
+  }catch(e){ return { ok:false }; }
+}
+// version: string = só grava se o documento ainda estiver nessa versão;
+// null = só grava se o documento ainda não existir; undefined = sem trava.
+async function escreverRecordsRemoto(obj, version){
+  const valor = JSON.stringify(obj);
+  const temPre = version !== undefined;
+  const uid = currentUid();
+  if(!uid){ lastStorageError = 'sem usuário logado'; return { ok:false, erro:lastStorageError }; }
+  try{
+    const token = await auth.currentUser.getIdToken();
+    let url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${encodeURIComponent(STORAGE_KEY)}`;
+    if(version) url += '?currentDocument.updateTime=' + encodeURIComponent(version);
+    else if(version === null) url += '?currentDocument.exists=false';
+    const body = { fields:{ value:{ stringValue: valor }, updatedAt:{ timestampValue: new Date().toISOString() } } };
+    const {v:res, timedOut} = await withTimeout(fetch(url, {
+      method:'PATCH', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body: JSON.stringify(body)
+    }), 12000);
+    if(timedOut){ lastStorageError = 'tempo esgotado — verifique sua internet'; return { ok:false, erro:lastStorageError }; }
+    if(res.ok){ writeCache(STORAGE_KEY, valor); return { ok:true }; }
+    let err = null; try{ err = (await res.json()).error; }catch(e){}
+    const f = PontoCore.classificarFalhaDeEscrita(res.status, err && err.status, temPre);
+    if(f.semPrecondicao){
+      // o servidor não aceitou a trava: grava como sempre gravou (nunca pior que antes)
+      const ok = await storageSet(STORAGE_KEY, valor);
+      return { ok, erro: lastStorageError };
+    }
+    lastStorageError = 'http ' + res.status + (err && err.message ? ': ' + err.message : '');
+    return { ok:false, conflito:f.conflito, erro:lastStorageError };
+  }catch(e){
+    console.error('escreverRecordsRemoto', e);
+    lastStorageError = e.message || 'erro desconhecido';
+    return { ok:false, erro:lastStorageError };
   }
 }
 async function saveRecords(){
-  const ok = await storageSet(STORAGE_KEY, JSON.stringify(records));
-  if(!ok) showToast('Não foi possível salvar (' + (lastStorageError||'erro desconhecido') + ').', 6000);
-  return ok;
+  const r = await PontoCore.gravarRecordsComMerge({ base: recordsBase, mine: records, ler: lerRecordsRemoto, escrever: escreverRecordsRemoto });
+  if(!r.ok){
+    const motivo = r.motivo === 'conflito' ? 'os dados mudaram várias vezes enquanto salvava — tente de novo' : (r.erro || lastStorageError || 'erro desconhecido');
+    showToast('Não foi possível salvar (' + motivo + ').', 6000);
+    return false;
+  }
+  // traz pra tela o que o servidor tinha de novo (ex.: um abono do ADM), mantendo o mesmo objeto
+  Object.keys(records).forEach(k=>{ delete records[k]; });
+  Object.assign(records, r.merged);
+  snapshotRecordsBase();
+  return true;
 }
 // Quando o ADM recusa um pedido de ajuste/exclusão, ele marca o dia com
 // "avisoRecusado". Aqui a gente confere isso ao abrir o app, mostra um
