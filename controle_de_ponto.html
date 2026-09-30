@@ -3,13 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ponto">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap">
 <title>Controle de Ponto</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111111">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
 
 :root{
   --bg:#FFFFFF;
@@ -159,7 +166,7 @@ body{
   transition:opacity .12s ease;
   margin-bottom:10px;
 }
-.btn-main:hover{opacity:0.85;}
+@media (hover:hover){ .btn-main:hover{opacity:0.85;} }
 .btn-main:active{opacity:0.7;}
 .btn-main:disabled{
   background:var(--paper-dark);
@@ -192,7 +199,7 @@ body{
   letter-spacing:0.5px;
   cursor:pointer;
 }
-.edit-btn:hover, .security-btn:hover{background:var(--ink); color:#fff;}
+@media (hover:hover){ .edit-btn:hover, .security-btn:hover{background:var(--ink); color:#fff;} }
 
 .summary{
   display:flex;
@@ -236,7 +243,7 @@ body{
   cursor:pointer;
   color:var(--ink);
 }
-.export-btn:hover, .days-btn:hover{background:var(--ink); color:#fff;}
+@media (hover:hover){ .export-btn:hover, .days-btn:hover{background:var(--ink); color:#fff;} }
 .days-btn.active{background:var(--ink); color:#fff;}
 
 .days-panel{display:none;}
@@ -264,7 +271,7 @@ body{
   cursor:pointer;
   color:var(--ink);
 }
-.month-nav button:hover{background:var(--ink); color:#fff;}
+@media (hover:hover){ .month-nav button:hover{background:var(--ink); color:#fff;} }
 .month-nav > div{
   flex:1;
   min-width:0;
@@ -508,6 +515,7 @@ tr:last-child td{border-bottom:none;}
 .receipt-row .r-value{font-weight:700; color:var(--ink);}
 .receipt-row.total{background:var(--paper-dark); font-size:14.5px;}
 .receipt-row.total .r-value{font-size:16px;}
+.comp-tag{font-family:'Inter',sans-serif; font-size:11px; color:var(--muted); font-style:italic;}
 .receipt-note{
   font-family:'Inter',sans-serif; font-size:11.5px; color:var(--muted);
   padding:8px 12px; background:#fff; font-style:italic;
@@ -518,9 +526,53 @@ tr:last-child td{border-bottom:none;}
   .header h1{font-size:22px;}
   .punch-status{grid-template-columns:repeat(2,1fr);}
 }
+
+
+/* ================= iPhone / toque =================
+   O que travava o uso no iOS Safari:
+   - campo com fonte menor que 16px faz o iOS dar zoom ao tocar e a tela fica deslocada;
+   - modal mais alto que a tela não rolava e escondia os botões;
+   - botões menores que 44px e :hover que "gruda" depois do toque;
+   - a página de trás rolava junto com o modal aberto. */
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
+html.modal-aberto, html.modal-aberto body{overflow:hidden;}
+body{min-height:100vh; min-height:100dvh; -webkit-tap-highlight-color:transparent;}
+button, select, label, summary, [role="button"]{touch-action:manipulation;}
+input, select, textarea{font-size:16px !important; min-width:0; max-width:100%;}
+input[type="checkbox"], input[type="radio"]{width:22px !important; height:22px; flex-shrink:0; accent-color:var(--ink);}
+.modal-overlay{overscroll-behavior:contain;}
+.modal{max-height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+.modal-wide{width:100%;}
+.receipt-row .r-value{white-space:nowrap;}
+/* botões sempre à vista nos modais altos (rolam por baixo) */
+#payrollOverlay .modal-actions, #editModalOverlay .modal-actions, #setupOverlay .modal-actions, #loginPasswordOverlay .modal-actions{position:sticky; bottom:-22px; background:#fff; padding:12px 0 14px; margin-top:8px;}
+.drawer-body, .fs-body{-webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+.table-wrap{-webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;}
+.field-row input[type="date"], .field-row input[type="time"]{min-height:44px;}
+@media (max-width:600px){
+  .header{padding-top:54px;}
+  .menu-btn{top:0; left:0;}
+  .table-wrap{max-height:none;}
+  #locationsList{max-height:none !important;}
+  body{padding:20px 12px 40px;}
+  .card{padding:18px 14px 10px;}
+}
+@media (pointer:coarse){
+  .month-nav button, .fs-nav button, .fs-close, .drawer-close, .menu-btn{width:44px; height:44px; font-size:18px;}
+  .icon-btn{min-width:44px; min-height:44px; font-size:18px;}
+  .export-btn, .days-btn, .edit-btn, .security-btn, .toggle-btn{min-height:44px;}
+  .link-btn{min-height:44px; display:inline-flex; align-items:center;}
+  .modal-actions button{min-height:46px; padding:10px 18px; flex:1 1 auto;}
+  .drawer-item{min-height:48px;}
+  .btn-main{min-height:56px;}
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea{min-height:44px;}
+  .row-actions{gap:2px;}
+}
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="ponto-core.js"></script>
 </head>
 <body>
 <div class="drawer-overlay" id="drawerOverlay">
@@ -604,7 +656,7 @@ tr:last-child td{border-bottom:none;}
         <span class="tot-value" id="totalHoje">—</span>
       </div>
       <div class="summary" id="extraRow" style="display:none; border-color:var(--stamp-red);">
-        <span class="tot-label">Hora extra hoje (acima de 6h)</span>
+        <span class="tot-label" id="extraHojeLabel">Hora extra hoje</span>
         <span class="tot-value" id="extraHoje" style="color:var(--stamp-red);">—</span>
       </div>
 
@@ -673,7 +725,7 @@ tr:last-child td{border-bottom:none;}
     </div>
     <div class="field-row">
       <label for="authIdentifier" id="authIdentifierLabel">E-mail</label>
-      <input type="text" id="authIdentifier" autocomplete="username" placeholder="seu@email.com">
+      <input type="text" id="authIdentifier" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" placeholder="seu@email.com">
     </div>
     <div class="field-row">
       <label for="authPassword">Senha</label>
@@ -981,23 +1033,18 @@ function formatBRL(n){
 // Jornada padrão em minutos — acima disso vira hora extra. Configurável
 // por funcionário pelo painel do admin (campo "jornadaPadraoMin"); se não
 // estiver configurada, cai no padrão histórico de 6h.
-const LIMITE_NORMAL_MIN_DEFAULT = 6*60;
+// Toda a conta de horas/hora extra mora em ponto-core.js e é a MESMA usada
+// pelo painel do ADM e pela folha de pagamentos — não recalcule aqui.
+const LIMITE_NORMAL_MIN_DEFAULT = PontoCore.JORNADA_PADRAO_MIN_DEFAULT;
 function jornadaPadraoMin(){
-  const v = employee && employee.jornadaPadraoMin;
-  return (v && v>0) ? v : LIMITE_NORMAL_MIN_DEFAULT;
+  return PontoCore.jornadaPadraoDoEmployee(employee);
+}
+function textoJornada(){
+  return PontoCore.formatMinutes(jornadaPadraoMin());
 }
 
-function timeToMinutes(t){
-  if(!t) return null;
-  const [h,m] = t.split(':').map(Number);
-  return h*60+m;
-}
-function formatMinutes(mins){
-  mins = Math.round(mins || 0);
-  const h = Math.floor(mins/60);
-  const mm = mins%60;
-  return `${h}h${pad(mm)}`;
-}
+const timeToMinutes = PontoCore.timeToMinutes;
+const formatMinutes = PontoCore.formatMinutes;
 function activeTipos(){
   return isDiarista() ? ['entrada','saida'] : TIPOS;
 }
@@ -1015,42 +1062,24 @@ function calcDiaria(mins){
   const base = Number(v['4']||v[4]||0);
   return { tier:null, valor: base ? (base/4)*horas : 0, estimado:true };
 }
+// Abono (dia dispensado com direito a pagamento) e Folga (dia de folga usando
+// saldo de hora extra) só são criados pelo administrador — contam como dia
+// pago, mas não têm horário batido nem geram hora extra. Sábado/domingo
+// contam inteiros como hora extra. `mins` = só o que foi batido; `totalMins`
+// inclui o complemento de jornada que o ADM registrou.
+// Texto curto do complemento de jornada (dia coberto com saldo de hora extra).
+function complementoTag(tot){
+  if(!tot || !(tot.compMins>0)) return '';
+  return ` <span class="comp-tag" title="Complemento de jornada registrado pelo administrador (sai do saldo de hora extra)">(${formatMinutes(tot.mins)} batido + ${formatMinutes(tot.compMins)} complemento)</span>`;
+}
 function calcTotal(rec, key){
-  if(!rec) return null;
-  if(rec.falta) return {falta:true, text:'Falta', mins:0, complete:true, extraMins:0, normalMins:0};
-  // Abono (dia dispensado com direito a pagamento) e Folga (dia de folga
-  // usando saldo de hora extra) só são criados pelo administrador — contam
-  // como dia pago, mas não têm horário batido nem geram hora extra.
-  if(rec.abono) return {abono:true, text:'Abono', mins:0, complete:true, extraMins:0, normalMins:0};
-  if(rec.folga) return {folga:true, text:'Folga', mins:0, complete:true, extraMins:0, normalMins:0};
-  // Sábado e domingo não são dias úteis normais — qualquer coisa trabalhada
-  // neles conta inteira como hora extra, mesmo que não passe de 6h.
-  let fimDeSemana = false;
-  if(key){
-    const [y,m,d] = key.split('-').map(Number);
-    const dow = new Date(y, m-1, d).getDay(); // 0=domingo, 6=sábado
-    fimDeSemana = (dow===0 || dow===6);
-  }
-  if(rec.diarista){
-    const e = timeToMinutes(rec.entrada);
-    const s = timeToMinutes(rec.saida);
-    if(e===null || s===null) return null;
-    const mins = Math.max(0, s-e);
-    if(fimDeSemana) return {text:formatMinutes(mins), mins, complete:true, extraMins:mins, normalMins:0, diarista:true};
-    return {text:formatMinutes(mins), mins, complete:true, extraMins:0, normalMins:mins, diarista:true};
-  }
-  const e = timeToMinutes(rec.entrada);
-  const as = timeToMinutes(rec.almocoSaida);
-  const av = timeToMinutes(rec.almocoVolta);
-  const s = timeToMinutes(rec.saida);
-  let mins = 0;
-  let complete = true;
-  if(e!==null && as!==null){ mins += (as-e); } else complete = false;
-  if(av!==null && s!==null){ mins += (s-av); } else complete = false;
-  if(mins<=0 && !complete) return null;
-  const extraMins = fimDeSemana ? mins : (mins > jornadaPadraoMin() ? mins - jornadaPadraoMin() : 0);
-  const normalMins = mins - extraMins;
-  return {text:formatMinutes(mins), mins, complete, extraMins, normalMins};
+  const t = PontoCore.calcDia(rec, key, employee);
+  if(!t) return null;
+  if(t.falta) t.text = 'Falta';
+  else if(t.abono) t.text = 'Abono';
+  else if(t.folga) t.text = 'Folga';
+  else t.text = formatMinutes(t.totalMins);
+  return t;
 }
 
 // --- hashing simples (SHA-256) para não guardar senha em texto puro ---
@@ -1795,7 +1824,7 @@ function renderToday(){
     document.getElementById('extraHoje').textContent = formatBRL(d.valor);
   }else if(tot && !tot.falta && tot.extraMins>0){
     extraRow.style.display='flex';
-    document.querySelector('#extraRow .tot-label').textContent = 'Hora extra hoje (acima de 6h)';
+    document.querySelector('#extraRow .tot-label').textContent = PontoCore.isFimDeSemana(todayKey()) ? 'Hora extra hoje (fim de semana)' : `Hora extra hoje (acima de ${textoJornada()})`;
     document.getElementById('extraHoje').textContent = formatMinutes(tot.extraMins);
   }else{
     extraRow.style.display='none';
@@ -2308,62 +2337,25 @@ function calcDescontoVT(salarioBase, valorMesVT, percentual){
   return Math.round(Math.min(limite, valorMesVT) * 100) / 100;
 }
 
-function diasTrabalhadosNoMes(mk){
-  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].entrada && !records[k].falta).length;
-}
+function diasTrabalhadosNoMes(mk){ return PontoCore.diasTrabalhadosNoMes(records, mk); }
 // Dias "pagos" no mês = dias fisicamente trabalhados + abonos + folgas.
 // Usado só pra calcular o salário proporcional (CLT/estagiário) — abono e
 // folga não geram Vale Alimentação/Transporte, porque a pessoa não foi
 // trabalhar fisicamente naquele dia.
-function diasAbonoNoMes(mk){
-  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].abono).length;
-}
-function diasFolgaNoMes(mk){
-  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].folga).length;
-}
+function diasAbonoNoMes(mk){ return PontoCore.diasAbonoNoMes(records, mk); }
+function diasFolgaNoMes(mk){ return PontoCore.diasFolgaNoMes(records, mk); }
 function diasPagosNoMes(mk){
   return diasTrabalhadosNoMes(mk) + diasAbonoNoMes(mk) + diasFolgaNoMes(mk);
-}
-// Lê o consumo de saldo em minutos, aceitando tanto o formato novo
-// (minutos inteiros) quanto o antigo (horas em decimal, de versões
-// anteriores) — sempre arredondado.
-function folgaMinutosConsumidos(folga){
-  if(!folga) return 0;
-  if(folga.minutosConvertidos!=null) return Math.round(Number(folga.minutosConvertidos)||0);
-  return Math.round((Number(folga.horasConvertidas)||0)*60);
-}
-function extraMinutosConsumidos(x){
-  if(x.minutos!=null) return Math.round(Number(x.minutos)||0);
-  return Math.round((Number(x.horas)||0)*60);
 }
 // Saldo de hora extra acumulado (todos os meses) — quanto ainda dá pra
 // converter em folga ou pedir pago em dinheiro. É diferente da "hora
 // extra gerada no mês", que é só o total daquele mês, sem descontar o
-// que já foi usado.
+// que já foi usado (folga, complemento de jornada e pagamento em dinheiro).
 function computeSaldoExtraTotal(){
-  let totalExtraMins = 0;
-  Object.keys(records).forEach(k=>{
-    const t = calcTotal(records[k], k);
-    if(t && !t.falta) totalExtraMins += Math.round(t.extraMins||0);
-  });
-  let usadoMins = 0;
-  Object.keys(records).forEach(k=>{ usadoMins += folgaMinutosConsumidos(records[k].folga); });
-  extrasPagos.forEach(x=>{ usadoMins += extraMinutosConsumidos(x); });
-  return Math.round(totalExtraMins - usadoMins);
+  return PontoCore.saldoHoraExtra(records, extrasPagos, employee).saldoMins;
 }
-function diasUteisNoMes(mk){
-  const [y,m] = mk.split('-').map(Number);
-  const diasNoMes = new Date(y, m, 0).getDate();
-  let count = 0;
-  for(let d=1; d<=diasNoMes; d++){
-    const dow = new Date(y, m-1, d).getDay(); // 0=domingo ... 6=sábado
-    if(dow>=1 && dow<=5) count++;
-  }
-  return count;
-}
-function faltasNoMes(mk){
-  return Object.keys(records).filter(k=>monthKeyOf(k)===mk && records[k] && records[k].falta).length;
-}
+function diasUteisNoMes(mk){ return PontoCore.diasUteisNoMes(mk); }
+function faltasNoMes(mk){ return PontoCore.faltasNoMes(records, mk); }
 
 function computePayrollBreakdown(mk){
   const diasUteis = diasUteisNoMes(mk);
@@ -2405,28 +2397,13 @@ function computePayrollBreakdown(mk){
   const va = (employee && employee.va) || 0;
   const vaMes = va * diasFisicos;
 
-  let extraMesMins = 0;
-  let totalMesMins = 0;
-  Object.keys(records).filter(k=>monthKeyOf(k)===mk).forEach(k=>{
-    const t = calcTotal(records[k], k);
-    if(t && !t.falta){ extraMesMins += t.extraMins; totalMesMins += t.mins; }
-  });
+  // Horas do mês (trabalhadas, extra, faltantes) e hora extra paga em
+  // dinheiro: mesma conta do painel do ADM e da folha de pagamentos.
+  const horas = PontoCore.resumoHorasMes(records, mk, employee, extrasPagos);
+  const { extraMesMins, totalMesMins, complementoMesMins, horasFaltantesMin, extrasPagasMins, extrasPagasValor } = horas;
+  const extrasPagasDoMes = horas.extrasPagasDoMes;
 
-  // Horas extras que o administrador marcou como "pagas em dinheiro" (em
-  // vez de viradas em folga) neste mês.
-  const extrasPagasDoMes = extrasPagos.filter(x=>x.mes===mk);
-  const extrasPagasMins = extrasPagasDoMes.reduce((s,x)=>s+extraMinutosConsumidos(x), 0);
-  const extrasPagasValor = extrasPagasDoMes.reduce((s,x)=>s+(Number(x.valor)||0), 0);
-
-  const out = { diasUteis, dias: diasFisicos, diasFisicos, diasAbono, diasFolga, diasPagos, faltas, salarioMes, vaMes, extraMesMins, totalMesMins, isCLT, isDiaristaTipo, extrasPagasMins, extrasPagasValor, extrasPagasDoMes };
-
-  // Horas faltantes: quanto ainda falta pra bater a jornada esperada no mês.
-  // Abono e folga contam como cumpridos (a pessoa não precisava trabalhar
-  // naquele dia); faltas e dias ainda não trabalhados geram o déficit.
-  const jornadaMinDia = jornadaPadraoMin();
-  const horasEsperadasMin = jornadaMinDia * diasUteis;
-  const horasCumpridasMin = totalMesMins + (diasAbono + diasFolga) * jornadaMinDia;
-  out.horasFaltantesMin = Math.max(0, horasEsperadasMin - horasCumpridasMin);
+  const out = { diasUteis, dias: diasFisicos, diasFisicos, diasAbono, diasFolga, diasPagos, faltas, salarioMes, vaMes, extraMesMins, totalMesMins, complementoMesMins, horasFaltantesMin, isCLT, isDiaristaTipo, extrasPagasMins, extrasPagasValor, extrasPagasDoMes };
 
   const vtAtivo = !!(employee && employee.vtAtivo);
   const vtForma = (employee && employee.vtForma) || 'cartao';
@@ -2466,6 +2443,7 @@ function openPayrollSummary(){
     <div class="receipt-row"><span class="r-label">Dias úteis no mês (seg. a sex.)</span><span class="r-value">${b.diasUteis}</span></div>
     <div class="receipt-row"><span class="r-label">Dias trabalhados</span><span class="r-value">${b.diasFisicos} de ${b.diasUteis}</span></div>
     <div class="receipt-row"><span class="r-label">Horas trabalhadas no mês</span><span class="r-value">${formatMinutes(b.totalMesMins)}</span></div>
+    ${b.complementoMesMins>0 ? `<div class="receipt-row"><span class="r-label">↳ inclui complemento de jornada</span><span class="r-value">${formatMinutes(b.complementoMesMins)}</span></div>` : ''}
     ${b.horasFaltantesMin>0 ? `<div class="receipt-row"><span class="r-label">Horas faltantes no mês</span><span class="r-value" style="color:var(--stamp-red);">${formatMinutes(b.horasFaltantesMin)}</span></div>` : ''}
     ${b.diasAbono>0 ? `<div class="receipt-row"><span class="r-label">Dias de abono</span><span class="r-value">${b.diasAbono}</span></div>` : ''}
     ${b.diasFolga>0 ? `<div class="receipt-row"><span class="r-label">Dias de folga (hora extra)</span><span class="r-value">${b.diasFolga}</span></div>` : ''}
@@ -2519,14 +2497,10 @@ function renderHistory(){
   let totalExtraMins = 0;
   keys.forEach(k=>{
     const tot = calcTotal(records[k], k);
-    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+    if(tot && !tot.falta){ totalMins += tot.totalMins; totalExtraMins += tot.extraMins; }
   });
   const th = Math.floor(totalMins/60), tm = totalMins%60;
-  const jornadaMinDia = jornadaPadraoMin();
-  const horasEsperadasMin = jornadaMinDia * diasUteisNoMes(viewMonth);
-  const diasAbonoFolga = diasAbonoNoMes(viewMonth) + diasFolgaNoMes(viewMonth);
-  const horasCumpridasMin = totalMins + diasAbonoFolga * jornadaMinDia;
-  const horasFaltantesMin = Math.max(0, horasEsperadasMin - horasCumpridasMin);
+  const { horasFaltantesMin } = PontoCore.resumoHorasMes(records, viewMonth, employee, extrasPagos);
   document.getElementById('monthTotal').textContent = keys.length
     ? `${keys.length} dia(s) · total ${th}h${pad(tm)}`
       + (totalExtraMins>0 ? ` · extra ${formatMinutes(totalExtraMins)}` : '')
@@ -2561,7 +2535,7 @@ function renderHistory(){
       <td>${rec.almocoSaida||'—'}</td>
       <td>${rec.almocoVolta||'—'}</td>
       <td>${rec.saida||'—'}</td>
-      <td>${tot?tot.text:'—'}</td>
+      <td>${tot?tot.text:'—'}${complementoTag(tot)}</td>
       <td>${tot && tot.extraMins>0 ? formatMinutes(tot.extraMins) : '—'}</td>
       <td>
         <div class="row-actions">
@@ -2591,7 +2565,7 @@ function renderFullscreen(){
   let totalMins = 0, totalExtraMins = 0;
   keys.forEach(k=>{
     const tot = calcTotal(records[k], k);
-    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+    if(tot && !tot.falta){ totalMins += tot.totalMins; totalExtraMins += tot.extraMins; }
   });
   const th = Math.floor(totalMins/60), tm = totalMins%60;
   document.getElementById('fsMonthTotal').textContent = keys.length
@@ -2621,7 +2595,7 @@ function renderFullscreen(){
         <div><div class="fs-lbl">Saída</div><div class="fs-val">${rec.saida||'—'}</div></div>
       </div>
       <div class="fs-totals">
-        <span>Total: <strong>${tot?tot.text:'—'}${tot && !tot.complete ? ' (parcial)' : ''}</strong></span>
+        <span>Total: <strong>${tot?tot.text:'—'}${tot && !tot.complete ? ' (parcial)' : ''}</strong>${complementoTag(tot)}</span>
         ${tot && tot.extraMins>0 ? `<span class="extra">Extra: ${formatMinutes(tot.extraMins)}</span>` : ''}
       </div>
     </div>`;
@@ -2673,7 +2647,7 @@ function payrollBreakdownPairs(mk){
   const pairs = [
     ['Dias úteis no mês', String(b.diasUteis)],
     ['Dias trabalhados', `${b.diasFisicos} de ${b.diasUteis}`],
-    ['Horas trabalhadas no mês', formatMinutes(b.totalMesMins)],
+    ['Horas trabalhadas no mês' + (b.complementoMesMins>0 ? ` (inclui ${formatMinutes(b.complementoMesMins)} de complemento)` : ''), formatMinutes(b.totalMesMins)],
   ];
   if(b.horasFaltantesMin>0) pairs.push(['Horas faltantes no mês', formatMinutes(b.horasFaltantesMin)]);
   if(b.diasAbono>0) pairs.push(['Dias de abono', String(b.diasAbono)]);
@@ -2703,7 +2677,7 @@ async function exportA4(){
     if(badge){
       return `<tr><td>${displayDateShort(key)}</td><td colspan="4" style="text-align:center;color:#b00020;font-weight:bold;">${esc(badge.label)}</td><td>—</td><td>—</td></tr>`;
     }
-    if(tot && !tot.falta){ totalMins += tot.mins; totalExtraMins += tot.extraMins; }
+    if(tot && !tot.falta){ totalMins += tot.totalMins; totalExtraMins += tot.extraMins; }
     return `<tr>
       <td>${displayDateShort(key)}</td>
       <td>${rec.entrada||'—'}</td>
@@ -2878,7 +2852,7 @@ async function importCSVFile(file){
 function exportCSV(){
   const keys = Object.keys(records).sort();
   if(keys.length===0){ showToast('Não há registros para exportar.'); return; }
-  let csv = 'Funcionario;' + safeCell(profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima de 6h);Observacao\n';
+  let csv = 'Funcionario;' + safeCell(profile && profile.nome ? profile.nome : 'Não informado') + '\n\nData;Entrada;Saida Almoco;Volta Almoco;Saida;Total;Hora Extra (acima da jornada de ' + textoJornada() + ');Observacao\n';
   keys.forEach(key=>{
     const rec = records[key];
     const tot = calcTotal(rec, key);
@@ -3164,6 +3138,19 @@ auth.onAuthStateChanged((user)=>{
     showAuthOverlay();
   }
 });
+</script>
+<script>
+// Enquanto um modal/menu/tela cheia está aberto, trava a rolagem da página de
+// trás (no iPhone o fundo rolava junto e o modal "fugia" do dedo).
+(function(){
+  var SEL = '.modal-overlay.show, .drawer-overlay.show, .fullscreen-overlay.show';
+  function sync(){ document.documentElement.classList.toggle('modal-aberto', !!document.querySelector(SEL)); }
+  var mo = new MutationObserver(sync);
+  document.querySelectorAll('.modal-overlay, .drawer-overlay, .fullscreen-overlay').forEach(function(el){
+    mo.observe(el, { attributes:true, attributeFilter:['class'] });
+  });
+  sync();
+})();
 </script>
 </body>
 </html>
