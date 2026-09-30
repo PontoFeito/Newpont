@@ -696,7 +696,7 @@ async function criarFuncionario(){
     if(!res.ok){ errEl.textContent = 'Conta de login criada, mas houve erro ao salvar o cadastro. Recarregue e tente configurar depois.'; return; }
     await addUidToIndex(novoUid);
     resultEl.style.display = 'block';
-    resultEl.innerHTML = `Conta criada! Repasse pra pessoa:<br><b>Login:</b> ${tipo==='cpf'?idRaw:authEmail}<br><b>Senha:</b> ${senha}<br><span style="color:var(--muted); font-family:'Inter',sans-serif; font-size:11.5px;">Ela pode trocar a senha depois, dentro do app.</span>`;
+    resultEl.innerHTML = `Conta criada! Repasse pra pessoa:<br><b>Login:</b> ${esc(tipo==='cpf'?idRaw:authEmail)}<br><b>Senha:</b> ${esc(senha)}<br><span style="color:var(--muted); font-family:'Inter',sans-serif; font-size:11.5px;">Ela pode trocar a senha depois, dentro do app.</span>`;
     document.getElementById('newNome').value = '';
     document.getElementById('newIdentifier').value = '';
     document.getElementById('newSenha').value = '';
@@ -789,8 +789,8 @@ async function loadSolicitacoes(){
       <div style="font-size:13px; margin:6px 0;">${diffHtml}</div>
       <div style="font-size:12.5px; color:var(--muted); margin-bottom:8px;">Justificativa: "${esc(s.justificativa||'')}"${s.editadoEm ? ' <em>(ajustado pelo funcionário depois de enviado)</em>' : ''}</div>
       <div class="row-actions">
-        <button class="btn small outline" data-approve="${s.id}" data-uid="${s.uid}">Aprovar</button>
-        <button class="btn small danger" data-reject="${s.id}" data-uid="${s.uid}">Rejeitar</button>
+        <button class="btn small outline" data-approve="${esc(s.id)}" data-uid="${esc(s.uid)}">Aprovar</button>
+        <button class="btn small danger" data-reject="${esc(s.id)}" data-uid="${esc(s.uid)}">Rejeitar</button>
       </div>
     </div>`;
   }).join('');
@@ -844,16 +844,10 @@ async function resolverSolicitacao(id, uid, aprovar){
   let gravouOk = true;
   if(!desatualizada){
     try{
-      const patchRes = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, {
-        method:'PATCH',
-        headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
-        body: JSON.stringify({ fields:{ value:{ stringValue: JSON.stringify(records) }, updatedAt:{ timestampValue:new Date().toISOString() } } })
-      });
-      if(!patchRes.ok){
+      const ok = await salvarRecords(uid, records);
+      if(!ok){
         gravouOk = false;
-        let detail = '';
-        try{ const errBody = await patchRes.json(); detail = errBody.error && errBody.error.message ? ': ' + errBody.error.message : ''; }catch(e){}
-        showToast(`Não deu pra aplicar o horário (HTTP ${patchRes.status}${detail}). A solicitação continua pendente — verifique as regras do Firestore.`, 9000);
+        showToast(`Não deu pra aplicar o horário (${ultimoErroEscrita || 'erro desconhecido'}). A solicitação continua pendente — verifique as regras do Firestore.`, 9000);
       }
     }catch(e){
       gravouOk = false;
@@ -982,23 +976,81 @@ function monthLabelOf(mk){
 const timeToMinutes = PontoCore.timeToMinutes;
 const formatMinutes = PontoCore.formatMinutes;
 
-async function fetchRecords(uid){
-  const token = await authToken();
-  const res = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/ponto-records`, { headers:{ Authorization:`Bearer ${token}` } });
-  if(res.status === 404) return {};
-  if(!res.ok) return {};
-  const data = await res.json();
-  const raw = data.fields && data.fields.value && data.fields.value.stringValue;
-  try{ return raw ? JSON.parse(raw) : {}; }catch(e){ return {}; }
+// --- pontos: leitura e gravação seguras ---
+// O funcionário também grava neste mesmo documento (ao bater o ponto). Gravar o
+// objeto inteiro "às cegas" apagava o que ele tinha acabado de registrar (e o
+// contrário também). Cada objeto devolvido por fetchRecords lembra o que o
+// servidor tinha naquele momento; salvarRecords relê o servidor, aplica por
+// cima só os dias que ESTA tela mexeu e grava com a versão lida
+// (ponto-core.js: gravarRecordsComMerge).
+const baseDosRecords = new WeakMap();   // objeto lido -> cópia do que o servidor tinha
+const leituraFalhou = new WeakSet();    // objetos devolvidos quando a leitura falhou
+let ultimoErroEscrita = '';
+
+async function lerAppdataComVersao(uid, key){
+  try{
+    const token = await authToken();
+    const res = await fetch(`${FIRESTORE_REST_BASE}/users/${uid}/appdata/${key}`, { headers:{ Authorization:`Bearer ${token}` } });
+    if(res.status === 404) return { ok:true, records:{}, version:null };   // ainda não existe
+    if(!res.ok) return { ok:false };
+    const data = await res.json();
+    const raw = data.fields && data.fields.value && data.fields.value.stringValue;
+    return { ok:true, records: raw ? JSON.parse(raw) : {}, version: data.updateTime || undefined };
+  }catch(e){ return { ok:false }; }
 }
-// Grava de volta o objeto inteiro de pontos batidos de um funcionário —
-// usado pra marcar abono/folga num dia específico.
-async function writeUserAppdata(uid, key, value){
-  const token = await authToken();
-  const url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${key}`;
+// version: string = só grava se o documento ainda estiver nessa versão;
+// null = só grava se ainda não existir; undefined = sem trava.
+async function escreverAppdata(uid, key, value, version){
+  const temPre = version !== undefined;
+  let url = `${FIRESTORE_REST_BASE}/users/${uid}/appdata/${key}`;
+  if(version) url += '?currentDocument.updateTime=' + encodeURIComponent(version);
+  else if(version === null) url += '?currentDocument.exists=false';
   const body = { fields: { value: { stringValue: value }, updatedAt: { timestampValue: new Date().toISOString() } } };
-  const res = await fetch(url, { method:'PATCH', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-  return res.ok;
+  let res;
+  try{ res = await fetch(url, { method:'PATCH', headers:{ Authorization:`Bearer ${await authToken()}`, 'Content-Type':'application/json' }, body: JSON.stringify(body) }); }
+  catch(e){ return { ok:false, erro:'erro de rede' }; }
+  if(res.ok) return { ok:true };
+  let err = null; try{ err = (await res.json()).error; }catch(e){}
+  const f = PontoCore.classificarFalhaDeEscrita(res.status, err && err.status, temPre);
+  if(f.semPrecondicao) return escreverAppdata(uid, key, value, undefined);   // servidor não aceitou a trava: grava como antes
+  return { ok:false, conflito:f.conflito, erro:'HTTP ' + res.status + (err && err.message ? ': ' + err.message : '') };
+}
+async function fetchRecords(uid){
+  const r = await lerAppdataComVersao(uid, 'ponto-records');
+  if(!r.ok){
+    // Falha de leitura NÃO é "sem registros": quem tentar gravar em cima disto é
+    // recusado (antes gravava só o dia editado por cima de todo o histórico).
+    const vazio = {}; leituraFalhou.add(vazio); return vazio;
+  }
+  baseDosRecords.set(r.records, JSON.parse(JSON.stringify(r.records)));
+  return r.records;
+}
+// Grava os pontos de um funcionário a partir do objeto lido com fetchRecords.
+async function salvarRecords(uid, records){
+  ultimoErroEscrita = '';
+  if(leituraFalhou.has(records)){ ultimoErroEscrita = 'não consegui ler os dados atuais do funcionário — nada foi salvo'; return false; }
+  const base = baseDosRecords.get(records);
+  if(base === undefined){   // não veio de fetchRecords: grava como sempre gravou
+    const r = await escreverAppdata(uid, 'ponto-records', JSON.stringify(records), undefined);
+    ultimoErroEscrita = r.erro || ''; return r.ok;
+  }
+  const r = await PontoCore.gravarRecordsComMerge({
+    base, mine: records,
+    ler: () => lerAppdataComVersao(uid, 'ponto-records'),
+    escrever: (obj, v) => escreverAppdata(uid, 'ponto-records', JSON.stringify(obj), v)
+  });
+  if(!r.ok){
+    ultimoErroEscrita = r.motivo === 'conflito' ? 'os dados mudaram várias vezes enquanto salvava — tente de novo' : (r.erro || 'erro desconhecido');
+    return false;
+  }
+  baseDosRecords.set(records, JSON.parse(JSON.stringify(r.merged)));
+  return true;
+}
+// Grava um documento de dados do funcionário sem trava (ex.: lista de extras pagas).
+async function writeUserAppdata(uid, key, value){
+  const r = await escreverAppdata(uid, key, value, undefined);
+  ultimoErroEscrita = r.erro || '';
+  return r.ok;
 }
 async function fetchExtrasPagos(uid){
   const token = await authToken();
@@ -1043,8 +1095,8 @@ async function renderSaldoExtra(){
     itens.push({data:k, tipo:'Abono', motivo:records[k].abono.motivo||'', onDelete: async ()=>{
       if(!confirm('Remover este abono? O dia volta a ficar em branco.')) return;
       delete records[k];
-      const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
-      if(ok){ showToast('Abono removido.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover.');
+      const ok = await salvarRecords(currentDetailUid, records);
+      if(ok){ showToast('Abono removido.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
     }});
   });
   Object.keys(records).filter(k=>records[k].folga).forEach(k=>{
@@ -1052,8 +1104,8 @@ async function renderSaldoExtra(){
     itens.push({data:k, tipo:`Folga (${formatMinutes(mins)})`, motivo:records[k].folga.motivo||'', onDelete: async ()=>{
       if(!confirm('Remover esta folga? As horas voltam pro saldo, e o dia volta a ficar em branco.')) return;
       delete records[k];
-      const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
-      if(ok){ showToast('Folga removida.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover.');
+      const ok = await salvarRecords(currentDetailUid, records);
+      if(ok){ showToast('Folga removida.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
     }});
   });
   Object.keys(records).filter(k=>records[k].complemento).forEach(k=>{
@@ -1062,8 +1114,8 @@ async function renderSaldoExtra(){
     itens.push({data:k, tipo:tipoLabel, motivo:records[k].complemento.motivo||'', onDelete: async ()=>{
       if(!confirm('Remover este complemento? As horas voltam pro saldo, e o dia volta a mostrar só o horário batido (incompleto).')) return;
       delete records[k].complemento;
-      const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
-      if(ok){ showToast('Complemento removido.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover.');
+      const ok = await salvarRecords(currentDetailUid, records);
+      if(ok){ showToast('Complemento removido.'); await Promise.all([renderMonth(), renderSaldoExtra()]); }else showToast('Não foi possível remover' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
     }});
   });
   extras.forEach(x=>{
@@ -1153,12 +1205,12 @@ async function saveAjusteManual(){
     records[dateKey] = rec;
   }
   if(motivo) records[dateKey].motivoAjusteAdmin = motivo;
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast(eraFolgaOuAbono ? 'Horários ajustados — folga/abono desfeito(a).' : 'Horários ajustados.');
     document.getElementById('ajusteManualOverlay').classList.remove('show');
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível salvar.');
+  }else showToast('Não foi possível salvar' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 
 // Tira uma folga ou abono de um dia específico (o dia volta a ficar em
@@ -1171,11 +1223,11 @@ async function removerFolgaOuAbono(dateKey){
   const tipo = rec.folga ? 'folga' : 'abono';
   if(!confirm(`Tirar a ${tipo} do dia ${dateKey.split('-').reverse().join('/')}? O dia volta a ficar em branco.`)) return;
   delete records[dateKey];
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast(`${tipo==='folga'?'Folga':'Abono'} removido(a).`);
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível remover.');
+  }else showToast('Não foi possível remover' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 // Remove o complemento de jornada de um dia — as horas voltam pro saldo e
 // o dia volta a mostrar só o horário efetivamente batido (incompleto de novo).
@@ -1186,11 +1238,11 @@ async function removerComplemento(dateKey){
   if(!confirm(`Remover o complemento do dia ${dateKey.split('-').reverse().join('/')}? As horas voltam pro saldo e o dia fica incompleto de novo.`)) return;
   delete rec.complemento;
   records[dateKey] = rec;
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast('Complemento removido.');
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível remover.');
+  }else showToast('Não foi possível remover' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 
 function openAbonoModal(dateKey){
@@ -1218,12 +1270,12 @@ async function saveAbono(){
     abono.valorDia = Number((e.diariaValores && e.diariaValores[valorTier]) || 0);
   }
   records[data] = { entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false, abono };
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast('Abono registrado.');
     document.getElementById('abonoOverlay').classList.remove('show');
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível salvar.');
+  }else showToast('Não foi possível salvar' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 
 function openFolgaModal(dateKey){
@@ -1260,12 +1312,12 @@ async function saveFolga(){
     folga.valorDia = Number((e.diariaValores && e.diariaValores[valorTier]) || 0);
   }
   records[data] = { entrada:null, almocoSaida:null, almocoVolta:null, saida:null, falta:false, folga };
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast('Folga registrada.');
     document.getElementById('folgaOverlay').classList.remove('show');
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível salvar.');
+  }else showToast('Não foi possível salvar' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 
 // --- jornada incompleta: complementar com saldo de hora extra, ou aceitar
@@ -1324,12 +1376,12 @@ async function saveComplemento(){
     delete rec.complemento;
   }
   records[dateKey] = rec;
-  const ok = await writeUserAppdata(currentDetailUid, 'ponto-records', JSON.stringify(records));
+  const ok = await salvarRecords(currentDetailUid, records);
   if(ok){
     showToast(opcao==='aceitar' ? 'Dia aceito como está.' : (opcao==='negativo' ? 'Jornada completada — saldo fica negativo.' : 'Jornada complementada com hora extra.'));
     document.getElementById('complementoOverlay').classList.remove('show');
     await Promise.all([renderMonth(), renderSaldoExtra()]);
-  }else showToast('Não foi possível salvar.');
+  }else showToast('Não foi possível salvar' + (ultimoErroEscrita ? ' (' + ultimoErroEscrita + ')' : '') + '.', 7000);
 }
 
 function openDinheiroModal(){
@@ -1477,14 +1529,14 @@ async function renderMonth(){
     }
     const locLinks = TIPOS.filter(t=>rec[t+'Loc']).map(t=>{
       const l = rec[t+'Loc'];
-      return `<a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">${LABELS[t]}📍</a>`;
+      return `<a href="https://www.google.com/maps?q=${encodeURIComponent(l.lat)},${encodeURIComponent(l.lng)}" target="_blank" rel="noopener">${esc(LABELS[t])}📍</a>`;
     }).join(' ');
     return `<tr>
       <td data-label="Data">${dateKey.split('-').reverse().join('/')}${rec.pendingRequest?' ⏳':''}</td>
-      <td data-label="Entrada">${rec.entrada||'—'}</td>
-      <td data-label="S. Almoço">${rec.almocoSaida||(rec.diarista?'—(diarista)':'—')}</td>
-      <td data-label="V. Almoço">${rec.almocoVolta||(rec.diarista?'—(diarista)':'—')}</td>
-      <td data-label="Saída">${rec.saida||'—'}</td>
+      <td data-label="Entrada">${esc(rec.entrada||'—')}</td>
+      <td data-label="S. Almoço">${esc(rec.almocoSaida||(rec.diarista?'—(diarista)':'—'))}</td>
+      <td data-label="V. Almoço">${esc(rec.almocoVolta||(rec.diarista?'—(diarista)':'—'))}</td>
+      <td data-label="Saída">${esc(rec.saida||'—')}</td>
       <td data-label="Total">${texto}</td>
       <td data-label="Extra">${extraDia>0 ? `<span style="color:var(--stamp-red); font-weight:600;">${formatMinutes(extraDia)}</span>` : '—'}</td>
       <td data-label="Local">${locLinks||'—'}</td>

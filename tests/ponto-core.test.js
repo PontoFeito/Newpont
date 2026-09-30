@@ -111,3 +111,93 @@ test('formatMinutes', () => {
   assert.equal(C.formatMinutes(59.6), '1h00');
   assert.equal(C.formatMinutes(-90), '-1h30');
 });
+
+// ---- gravação segura: dois lados gravando ao mesmo tempo ----
+// Servidor falso com "versão" por documento e precondição, como o Firestore.
+function servidor(inicial){
+  const s = { dados: JSON.parse(JSON.stringify(inicial)), versao: 1, gravacoes: 0 };
+  s.ler = async () => ({ ok:true, records: JSON.parse(JSON.stringify(s.dados)), version: s.versao });
+  s.escrever = async (obj, v) => {
+    if(v !== undefined && v !== s.versao) return { ok:false, conflito:true };
+    s.dados = JSON.parse(JSON.stringify(obj)); s.versao++; s.gravacoes++;
+    return { ok:true };
+  };
+  return s;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+
+test('mesclar: aplica só os dias que este lado mexeu', () => {
+  const base   = { [seg]: dia('08:00','12:00','13:00','17:00') };
+  const mine   = { [seg]: dia('08:00','12:00','13:00','17:00'), [ter]: dia('08:00',null,null,null) };  // bati o ponto na terça
+  const latest = { [seg]: dia('08:00','12:00','13:00','17:00'), '2026-09-09': { abono:{ motivo:'atestado' } } }; // ADM abonou outro dia
+  const r = C.mesclarRecordsPorDia(base, mine, latest);
+  assert.deepEqual(Object.keys(r).sort(), [seg, ter, '2026-09-09'].sort());
+  assert.deepEqual(r['2026-09-09'], { abono:{ motivo:'atestado' } });
+  assert.equal(r[ter].entrada, '08:00');
+});
+
+test('mesclar: excluir um dia só apaga esse dia', () => {
+  const base = { [seg]: dia('08:00','12:00','13:00','17:00'), [ter]: { falta:true } };
+  const mine = { [ter]: { falta:true } };
+  const latest = { [seg]: dia('08:00','12:00','13:00','17:00'), [ter]: { falta:true }, '2026-09-10': { falta:true } };
+  assert.deepEqual(Object.keys(C.mesclarRecordsPorDia(base, mine, latest)).sort(), [ter, '2026-09-10'].sort());
+});
+
+test('BUG ANTIGO: o funcionário grava com dados velhos e apagava o abono que o ADM acabou de marcar', async () => {
+  const s = servidor({ [seg]: dia('08:00','12:00','13:00','17:00') });
+  const base = clone(s.dados);                       // o app do funcionário leu isto
+  s.dados['2026-09-09'] = { abono:{ motivo:'atestado' } }; s.versao++;   // ADM abona um dia depois
+  const mine = clone(base); mine[ter] = dia('08:00',null,null,null);     // funcionário bate o ponto
+  const r = await C.gravarRecordsComMerge({ base, mine, ler: s.ler, escrever: s.escrever });
+  assert.equal(r.ok, true);
+  assert.ok(s.dados['2026-09-09'] && s.dados['2026-09-09'].abono, 'o abono do ADM tem que continuar lá');
+  assert.equal(s.dados[ter].entrada, '08:00');
+  assert.equal(r.mesclou, true);
+});
+
+test('conflito no meio da gravação: tenta de novo com a versão nova e não perde nada', async () => {
+  const s = servidor({ [seg]: dia('08:00','12:00','13:00','17:00') });
+  const base = clone(s.dados), mine = clone(base); mine[ter] = dia('09:00',null,null,null);
+  let primeira = true;
+  const ler = async () => { const r = await s.ler(); if(primeira){ primeira = false;
+      // depois da leitura e antes da escrita, o ADM grava
+      s.dados['2026-09-09'] = { folga:{ minutosConvertidos: 60 } }; s.versao++; } return r; };
+  const r = await C.gravarRecordsComMerge({ base, mine, ler, escrever: s.escrever });
+  assert.equal(r.ok, true);
+  assert.ok(s.dados['2026-09-09'].folga);
+  assert.equal(s.dados[ter].entrada, '09:00');
+});
+
+test('conflito que nunca acaba: falha em vez de sobrescrever', async () => {
+  const s = servidor({});
+  const ler = async () => { const r = await s.ler(); s.versao++; return r; };   // sempre muda antes de gravar
+  const r = await C.gravarRecordsComMerge({ base:{}, mine:{ [seg]: { falta:true } }, ler, escrever: s.escrever, tentativas: 3 });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'conflito');
+  assert.equal(s.gravacoes, 0);
+});
+
+test('releitura falhou: grava como antes (não fica pior)', async () => {
+  const s = servidor({});
+  const r = await C.gravarRecordsComMerge({ base:{}, mine:{ [seg]: { falta:true } }, ler: async()=>({ ok:false }), escrever: s.escrever });
+  assert.equal(r.ok, true);
+  assert.ok(s.dados[seg]);
+});
+
+test('erro de escrita que não é conflito não fica repetindo', async () => {
+  let chamadas = 0;
+  const r = await C.gravarRecordsComMerge({ base:{}, mine:{}, ler: async()=>({ ok:true, records:{}, version:1 }),
+    escrever: async()=>{ chamadas++; return { ok:false, erro:'http 403' }; } });
+  assert.equal(r.ok, false); assert.equal(chamadas, 1); assert.equal(r.erro, 'http 403');
+});
+
+test('classificar erro de escrita: conflito x parâmetro recusado x erro de verdade', () => {
+  const c = C.classificarFalhaDeEscrita;
+  assert.deepEqual(c(400, 'FAILED_PRECONDITION', true), { conflito:true,  semPrecondicao:false });
+  assert.deepEqual(c(409, 'ABORTED', true),             { conflito:true,  semPrecondicao:false });
+  assert.deepEqual(c(404, 'NOT_FOUND', true),           { conflito:true,  semPrecondicao:false });  // documento apagado no meio
+  assert.deepEqual(c(400, 'INVALID_ARGUMENT', true),    { conflito:false, semPrecondicao:true  });  // servidor não entendeu o parâmetro
+  assert.deepEqual(c(403, 'PERMISSION_DENIED', true),   { conflito:false, semPrecondicao:false });
+  assert.deepEqual(c(503, 'UNAVAILABLE', true),         { conflito:false, semPrecondicao:false });
+  assert.deepEqual(c(400, 'FAILED_PRECONDITION', false),{ conflito:false, semPrecondicao:false });  // sem precondição não existe conflito
+});
