@@ -201,3 +201,65 @@ test('classificar erro de escrita: conflito x parâmetro recusado x erro de verd
   assert.deepEqual(c(503, 'UNAVAILABLE', true),         { conflito:false, semPrecondicao:false });
   assert.deepEqual(c(400, 'FAILED_PRECONDITION', false),{ conflito:false, semPrecondicao:false });  // sem precondição não existe conflito
 });
+
+// ---- extrato da hora extra ----
+test('extrato: gerada (dia a dia), usos (folga, saiu mais cedo, pago, abono) e total − usado = saldo', () => {
+  const records = {
+    '2026-08-31': dia('08:00','12:00','13:00','20:00'),                                       // ago: 5h extra
+    '2026-09-01': dia('08:00','12:00','13:00','19:00'),                          // set: 4h extra
+    '2026-09-02': dia('08:00','12:00','13:00','14:00', { complemento:{ minutos:60, motivo:'saiu cedo' } }),
+    [sab]: dia('08:00','10:00','10:30','12:30'),                                              // sáb: 4h extra
+    '2026-09-08': { abono:{ motivo:'atestado' } },
+    '2026-09-09': { folga:{ minutosConvertidos:120, motivo:'compensação' } },
+  };
+  const extras = [{ id:'a', mes:'2026-09', minutos:90, valor:75.5, motivo:'pago', quando:'2026-09-15T15:00:00.000Z' },
+                  { id:'b', mes:'2026-08', minutos:30, valor:20, motivo:'ago', quando:'2026-08-31T15:00:00.000Z' }];
+  const m = C.movimentoHoraExtra(records, extras, '2026-09', clt6);
+  assert.deepEqual(m.geradas.map(g=>[g.key, g.extraMins, g.fimDeSemana]), [['2026-09-01', 240, false], [sab, 240, true]]);
+  assert.equal(m.geradaMesMins, 480);
+  assert.deepEqual(m.usos.map(u=>[u.tipo, u.key, u.mins]),
+    [['complemento','2026-09-02',60], ['abono','2026-09-08',0], ['folga','2026-09-09',120], ['dinheiro','2026-09-15',90]].sort((a,b)=>a[1].localeCompare(b[1])));
+  assert.equal(m.usos.find(u=>u.tipo==='complemento').batidoMins, 300);          // bateu 5h e saiu mais cedo
+  assert.equal(m.usadoMesMins, 60 + 120 + 90);                                   // abono não consome saldo
+  assert.equal(m.acumulado.geradoMins, 780);                                      // 5h (ago) + 4h + 4h
+  assert.equal(m.acumulado.usadoMins, 60 + 120 + 90 + 30);                        // + 30min pagos referentes a agosto
+  assert.equal(m.acumulado.usadoOutrosMesesMins, 30);
+  assert.equal(m.acumulado.saldoMins, 780 - 300);
+  // a conta final é a mesma do saldo que todas as telas mostram
+  assert.equal(m.acumulado.saldoMins, C.saldoHoraExtra(records, extras, clt6).saldoMins);
+  assert.equal(m.acumulado.geradoMins - m.acumulado.usadoMins, m.acumulado.saldoMins);
+});
+
+test('extrato: complemento "deixar negativo" aparece marcado e o saldo pode ficar negativo', () => {
+  const records = { '2026-09-02': dia('08:00','12:00','13:00','14:00', { complemento:{ minutos:60, motivo:'x', negativo:true } }) };
+  const m = C.movimentoHoraExtra(records, [], '2026-09', clt6);
+  assert.equal(m.usos[0].negativo, true);
+  assert.equal(m.acumulado.saldoMins, -60);
+});
+
+test('extrato: mês sem nada devolve listas vazias e o saldo acumulado', () => {
+  const m = C.movimentoHoraExtra({ '2026-08-31': dia('08:00','12:00','13:00','20:00') }, [], '2026-09', clt6);
+  assert.deepEqual([m.geradas.length, m.usos.length, m.geradaMesMins, m.usadoMesMins], [0,0,0,0]);
+  assert.equal(m.acumulado.saldoMins, 300);
+});
+
+test('extrato em HTML: lista os usos, fecha a conta e escapa texto do usuário', () => {
+  const records = {
+    '2026-09-01': dia('08:00','12:00','13:00','19:00'),
+    '2026-09-02': dia('08:00','12:00','13:00','14:00', { complemento:{ minutos:60, motivo:'<img src=x onerror=alert(1)>' } }),
+    '2026-09-09': { folga:{ minutosConvertidos:120, motivo:'compensação' } },
+  };
+  const extras = [{ id:'a', mes:'2026-09', minutos:30, valor:20, motivo:'pago', quando:'2026-09-15T15:00:00.000Z' }];
+  const mv = C.movimentoHoraExtra(records, extras, '2026-09', clt6);
+  const html = C.htmlExtratoHoraExtra(mv, 'setembro de 2026');
+  assert.match(html, /Saiu mais cedo: bateu 5h00 e foi completado com 1h00/);
+  assert.match(html, /Folga de dia inteiro usando hora extra/);
+  assert.match(html, /Pago em dinheiro \(R\$\s*20,00/);
+  assert.match(html, /\(=\) Saldo de hora extra/);
+  assert.ok(!html.includes('<img'), 'o motivo digitado pelo ADM tem que sair escapado');
+  assert.ok(html.includes('&lt;img'));
+  // sem valores de pagamento (quando a pessoa escolhe não incluir) não aparece R$
+  assert.ok(!/R\$/.test(C.htmlExtratoHoraExtra(mv, 'setembro de 2026', { mostrarValores:false })));
+  // sem nada a mostrar, não imprime bloco
+  assert.equal(C.htmlExtratoHoraExtra(C.movimentoHoraExtra({}, [], '2026-09', clt6), 'setembro'), '');
+});

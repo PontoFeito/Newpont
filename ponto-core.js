@@ -195,6 +195,118 @@
     };
   }
 
+  // Extrato da hora extra de um mês: de onde ela veio (dia a dia) e como foi
+  // usada (folga, saiu mais cedo = complemento de jornada, pago em dinheiro).
+  // Abono aparece na lista, mas NÃO consome saldo. No fim, a conta acumulada:
+  // total gerado − total usado = saldo (o mesmo saldo mostrado em todas as telas).
+  function movimentoHoraExtra(records, extrasPagos, mk, employee){
+    const geradas = [], usos = [];
+    Object.keys(records || {}).sort().forEach(k=>{
+      const rec = records[k];
+      if(!rec || monthKeyOf(k) !== mk) return;
+      const t = calcDia(rec, k, employee);
+      if(t && !t.falta && t.extraMins > 0){
+        geradas.push({ key:k, trabalhouMins:t.mins, extraMins:Math.round(t.extraMins), fimDeSemana:isFimDeSemana(k) });
+      }
+      if(rec.abono){
+        usos.push({ tipo:'abono', key:k, mins:0, motivo:rec.abono.motivo || '', valorDia:Number(rec.abono.valorDia) || 0 });
+      }
+      if(rec.folga){
+        usos.push({ tipo:'folga', key:k, mins:folgaMinutosConsumidos(rec.folga), motivo:rec.folga.motivo || '', valorDia:Number(rec.folga.valorDia) || 0 });
+      }
+      if(rec.complemento){
+        usos.push({ tipo:'complemento', key:k, mins:complementoMinutosConsumidos(rec.complemento), motivo:rec.complemento.motivo || '',
+                    negativo:!!rec.complemento.negativo, batidoMins: t ? t.mins : minutosBatidos(rec).mins });
+      }
+    });
+    (extrasPagos || []).filter(x=>x.mes === mk).forEach(x=>{
+      let key = '';
+      if(x.quando){ const d = new Date(x.quando); if(!isNaN(d)) key = dateKeyOf(d); }
+      usos.push({ tipo:'dinheiro', key, mes:x.mes, mins:extraMinutosConsumidos(x), valor:Number(x.valor) || 0, motivo:x.motivo || '' });
+    });
+    usos.sort((a,b)=> (a.key || '9999').localeCompare(b.key || '9999') || a.tipo.localeCompare(b.tipo));
+    const geradaMesMins = geradas.reduce((s,g)=>s+g.extraMins, 0);
+    const usadoMesMins = usos.reduce((s,u)=>s+u.mins, 0);
+    const acum = saldoHoraExtra(records, extrasPagos, employee);
+    return {
+      jornadaMin: jornadaPadraoDoEmployee(employee),
+      geradas, geradaMesMins, usos, usadoMesMins,
+      acumulado: {
+        geradoMins: acum.totalExtraMins, usadoMins: acum.usadoMins, saldoMins: acum.saldoMins,
+        folgaMins: acum.folgaMins, complementoMins: acum.complementoMins, pagoMins: acum.pagoMins,
+        usadoOutrosMesesMins: acum.usadoMins - usadoMesMins
+      }
+    };
+  }
+
+  // --- extrato da hora extra em HTML (holerite da folha e "Exportar folha A4"
+  // do funcionário usam ESTE código: a saída é idêntica nos dois) ---
+  const DIAS_CURTO = ['dom','seg','ter','qua','qui','sex','sáb'];
+  function escHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function brl(v){ return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+  function rotuloDia(key){
+    if(!key) return 'sem data';
+    const [y,m,d] = key.split('-').map(Number);
+    return `${pad(d)}/${pad(m)} (${DIAS_CURTO[new Date(y, m-1, d).getDay()]})`;
+  }
+  // mv = movimentoHoraExtra(...). opts.mostrarValores === false esconde os valores em R$.
+  function htmlExtratoHoraExtra(mv, mesLabel, opts){
+    if(!mv) return '';
+    const valores = !(opts && opts.mostrarValores === false);
+    const ac = mv.acumulado;
+    if(mv.geradas.length === 0 && mv.usos.length === 0 && ac.geradoMins === 0 && ac.usadoMins === 0) return '';
+    const linha = (rotulo, valor, cls) => `<div class="receipt-row ${cls || 'sub'}"><span>${rotulo}</span><span>${valor}</span></div>`;
+    const motivo = u => u.motivo ? ` — motivo: ${escHtml(u.motivo)}` : '';
+    const valorDia = u => (valores && u.valorDia > 0) ? ` (valor do dia: ${brl(u.valorDia)})` : '';
+    const geradasHtml = mv.geradas.length
+      ? mv.geradas.map(g => linha(
+          g.fimDeSemana
+            ? `${rotuloDia(g.key)} · fim de semana: trabalhou ${formatMinutes(g.trabalhouMins)} (tudo conta como hora extra)`
+            : `${rotuloDia(g.key)} · trabalhou ${formatMinutes(g.trabalhouMins)}, acima da jornada de ${formatMinutes(mv.jornadaMin)}`,
+          '+' + formatMinutes(g.extraMins))).join('')
+      : linha('Nenhuma hora extra gerada neste mês', '—');
+    const usosHtml = mv.usos.length
+      ? mv.usos.map(u=>{
+          const dia = rotuloDia(u.key);
+          if(u.tipo === 'complemento') return linha(`${dia} · Saiu mais cedo: bateu ${formatMinutes(u.batidoMins)} e foi completado com ${formatMinutes(u.mins)} de hora extra${u.negativo ? ' (deixou o saldo negativo)' : ''}${motivo(u)}`, '−' + formatMinutes(u.mins));
+          if(u.tipo === 'folga')       return linha(`${dia} · Folga de dia inteiro usando hora extra${valorDia(u)}${motivo(u)}`, '−' + formatMinutes(u.mins));
+          if(u.tipo === 'dinheiro')    return linha(`${u.key ? dia + ' · ' : ''}Pago em dinheiro${valores ? ' (' + brl(u.valor) + ', entra no total a receber do mês)' : ''}${motivo(u)}`, '−' + formatMinutes(u.mins));
+          return linha(`${dia} · Abono: dia dispensado com direito a pagamento (não usa hora extra)${valorDia(u)}${motivo(u)}`, '—');
+        }).join('')
+      : linha('Nenhuma hora extra usada neste mês', '—');
+    const partes = [];
+    if(ac.folgaMins) partes.push(`folgas ${formatMinutes(ac.folgaMins)}`);
+    if(ac.complementoMins) partes.push(`saídas mais cedo ${formatMinutes(ac.complementoMins)}`);
+    if(ac.pagoMins) partes.push(`pago em dinheiro ${formatMinutes(ac.pagoMins)}`);
+    const origemUsado = `neste mês ${formatMinutes(mv.usadoMesMins)}` + (ac.usadoOutrosMesesMins ? ` · outros meses ${formatMinutes(ac.usadoOutrosMesesMins)}` : '');
+    return `
+    <div class="extrato">
+      <div class="extrato-titulo">Extrato da hora extra — ${escHtml(mesLabel)}</div>
+      ${linha('Gerada neste mês', '+' + formatMinutes(mv.geradaMesMins), 'grupo')}
+      ${geradasHtml}
+      ${linha('Usada neste mês', '−' + formatMinutes(mv.usadoMesMins), 'grupo')}
+      ${usosHtml}
+      <div class="extrato-titulo">Conta final (todos os meses)</div>
+      ${linha('Total de hora extra gerada', formatMinutes(ac.geradoMins), 'conta')}
+      ${linha('(−) Total já usado' + (partes.length ? ` <small>(${partes.join(' · ')})</small>` : ''), '−' + formatMinutes(ac.usadoMins), 'conta')}
+      ${linha(`<small>${origemUsado}</small>`, '', 'sub')}
+      ${linha('(=) Saldo de hora extra' + (ac.saldoMins < 0 ? ' <small>(negativo: o funcionário ficou devendo)</small>' : ''), formatMinutes(ac.saldoMins), 'total')}
+    </div>`;
+  }
+  // Estilo para a janela de impressão (A4) que contém o extrato.
+  const cssExtratoImpressao = `
+      .receipt-row{ display:flex; justify-content:space-between; gap:14px; padding:6px 0; border-bottom:1px dashed #ccc; font-size:13px; break-inside:avoid; }
+      .receipt-row span:last-child{ white-space:nowrap; }
+      .receipt-row.total{ font-weight:bold; border-bottom:none; border-top:2px solid #111; margin-top:6px; padding-top:10px; }
+      .extrato{ margin-top:16px; border-top:2px solid #111; padding-top:6px; break-inside:avoid; font-family:Arial, Helvetica, sans-serif; color:#111; }
+      .extrato-titulo{ font-size:13px; font-weight:bold; text-transform:uppercase; margin:10px 0 4px; break-after:avoid; }
+      .receipt-row.sub{ font-size:11.5px; color:#444; padding-left:10px; }
+      .receipt-row.grupo{ font-weight:bold; border-bottom:1px solid #111; padding-top:8px; }
+      .receipt-row.conta{ font-weight:600; }
+      .receipt-row small{ font-size:10.5px; font-weight:normal; color:#555; }`;
+
   // Resumo de horas de um mês — o mesmo número em qualquer tela.
   function resumoHorasMes(records, mk, employee, extrasPagos){
     const jornada = jornadaPadraoDoEmployee(employee);
@@ -290,6 +402,7 @@
     folgaMinutosConsumidos, complementoMinutosConsumidos, extraMinutosConsumidos,
     calcDia, saldoHoraExtra,
     diasTrabalhadosNoMes, diasAbonoNoMes, diasFolgaNoMes, faltasNoMes, diasIncompletosDoMes,
-    extrasPagasDoMes, resumoHorasMes
+    extrasPagasDoMes, resumoHorasMes, movimentoHoraExtra,
+    htmlExtratoHoraExtra, cssExtratoImpressao
   };
 });

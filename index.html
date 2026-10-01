@@ -2783,6 +2783,11 @@ async function exportA4(){
       </table>
     `;
   }
+  // Extrato da hora extra (de onde veio, como foi usada e total − usado = saldo).
+  // Mesma montagem do holerite da folha de pagamentos (ponto-core.js). Se a pessoa
+  // escolheu não incluir valores de pagamento, o extrato também não mostra R$.
+  const extratoSection = PontoCore.htmlExtratoHoraExtra(
+    PontoCore.movimentoHoraExtra(records, extrasPagos, viewMonth, employee), monthLabelOf(viewMonth), { mostrarValores: includePayroll });
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Controle de Ponto</title>
     <style>
       @page{ size:A4; margin:16mm; }
@@ -2793,6 +2798,7 @@ async function exportA4(){
       th, td{ border:1px solid #999; padding:6px 8px; text-align:left; }
       th{ background:#111; color:#fff; }
       tr:nth-child(even){ background:#f5f5f5; }
+      ${PontoCore.cssExtratoImpressao}
     </style></head><body>
       <h1>Controle de Ponto — ${esc(nome)}</h1>
       <div class="sub">Referente a ${esc(monthLabelOf(viewMonth))} · Relatório gerado em ${new Date().toLocaleString('pt-BR')}</div>
@@ -2802,6 +2808,7 @@ async function exportA4(){
       </table>
       ${resumoSection}
       ${payrollSection}
+      ${extratoSection}
     </body></html>`);
   win.document.close();
   win.focus();
