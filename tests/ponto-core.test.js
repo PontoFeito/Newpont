@@ -242,3 +242,24 @@ test('extrato: mês sem nada devolve listas vazias e o saldo acumulado', () => {
   assert.deepEqual([m.geradas.length, m.usos.length, m.geradaMesMins, m.usadoMesMins], [0,0,0,0]);
   assert.equal(m.acumulado.saldoMins, 300);
 });
+
+test('extrato em HTML: lista os usos, fecha a conta e escapa texto do usuário', () => {
+  const records = {
+    '2026-09-01': dia('08:00','12:00','13:00','19:00'),
+    '2026-09-02': dia('08:00','12:00','13:00','14:00', { complemento:{ minutos:60, motivo:'<img src=x onerror=alert(1)>' } }),
+    '2026-09-09': { folga:{ minutosConvertidos:120, motivo:'compensação' } },
+  };
+  const extras = [{ id:'a', mes:'2026-09', minutos:30, valor:20, motivo:'pago', quando:'2026-09-15T15:00:00.000Z' }];
+  const mv = C.movimentoHoraExtra(records, extras, '2026-09', clt6);
+  const html = C.htmlExtratoHoraExtra(mv, 'setembro de 2026');
+  assert.match(html, /Saiu mais cedo: bateu 5h00 e foi completado com 1h00/);
+  assert.match(html, /Folga de dia inteiro usando hora extra/);
+  assert.match(html, /Pago em dinheiro \(R\$\s*20,00/);
+  assert.match(html, /\(=\) Saldo de hora extra/);
+  assert.ok(!html.includes('<img'), 'o motivo digitado pelo ADM tem que sair escapado');
+  assert.ok(html.includes('&lt;img'));
+  // sem valores de pagamento (quando a pessoa escolhe não incluir) não aparece R$
+  assert.ok(!/R\$/.test(C.htmlExtratoHoraExtra(mv, 'setembro de 2026', { mostrarValores:false })));
+  // sem nada a mostrar, não imprime bloco
+  assert.equal(C.htmlExtratoHoraExtra(C.movimentoHoraExtra({}, [], '2026-09', clt6), 'setembro'), '');
+});
