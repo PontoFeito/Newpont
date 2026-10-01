@@ -195,6 +195,50 @@
     };
   }
 
+  // Extrato da hora extra de um mês: de onde ela veio (dia a dia) e como foi
+  // usada (folga, saiu mais cedo = complemento de jornada, pago em dinheiro).
+  // Abono aparece na lista, mas NÃO consome saldo. No fim, a conta acumulada:
+  // total gerado − total usado = saldo (o mesmo saldo mostrado em todas as telas).
+  function movimentoHoraExtra(records, extrasPagos, mk, employee){
+    const geradas = [], usos = [];
+    Object.keys(records || {}).sort().forEach(k=>{
+      const rec = records[k];
+      if(!rec || monthKeyOf(k) !== mk) return;
+      const t = calcDia(rec, k, employee);
+      if(t && !t.falta && t.extraMins > 0){
+        geradas.push({ key:k, trabalhouMins:t.mins, extraMins:Math.round(t.extraMins), fimDeSemana:isFimDeSemana(k) });
+      }
+      if(rec.abono){
+        usos.push({ tipo:'abono', key:k, mins:0, motivo:rec.abono.motivo || '', valorDia:Number(rec.abono.valorDia) || 0 });
+      }
+      if(rec.folga){
+        usos.push({ tipo:'folga', key:k, mins:folgaMinutosConsumidos(rec.folga), motivo:rec.folga.motivo || '', valorDia:Number(rec.folga.valorDia) || 0 });
+      }
+      if(rec.complemento){
+        usos.push({ tipo:'complemento', key:k, mins:complementoMinutosConsumidos(rec.complemento), motivo:rec.complemento.motivo || '',
+                    negativo:!!rec.complemento.negativo, batidoMins: t ? t.mins : minutosBatidos(rec).mins });
+      }
+    });
+    (extrasPagos || []).filter(x=>x.mes === mk).forEach(x=>{
+      let key = '';
+      if(x.quando){ const d = new Date(x.quando); if(!isNaN(d)) key = dateKeyOf(d); }
+      usos.push({ tipo:'dinheiro', key, mes:x.mes, mins:extraMinutosConsumidos(x), valor:Number(x.valor) || 0, motivo:x.motivo || '' });
+    });
+    usos.sort((a,b)=> (a.key || '9999').localeCompare(b.key || '9999') || a.tipo.localeCompare(b.tipo));
+    const geradaMesMins = geradas.reduce((s,g)=>s+g.extraMins, 0);
+    const usadoMesMins = usos.reduce((s,u)=>s+u.mins, 0);
+    const acum = saldoHoraExtra(records, extrasPagos, employee);
+    return {
+      jornadaMin: jornadaPadraoDoEmployee(employee),
+      geradas, geradaMesMins, usos, usadoMesMins,
+      acumulado: {
+        geradoMins: acum.totalExtraMins, usadoMins: acum.usadoMins, saldoMins: acum.saldoMins,
+        folgaMins: acum.folgaMins, complementoMins: acum.complementoMins, pagoMins: acum.pagoMins,
+        usadoOutrosMesesMins: acum.usadoMins - usadoMesMins
+      }
+    };
+  }
+
   // Resumo de horas de um mês — o mesmo número em qualquer tela.
   function resumoHorasMes(records, mk, employee, extrasPagos){
     const jornada = jornadaPadraoDoEmployee(employee);
@@ -290,6 +334,6 @@
     folgaMinutosConsumidos, complementoMinutosConsumidos, extraMinutosConsumidos,
     calcDia, saldoHoraExtra,
     diasTrabalhadosNoMes, diasAbonoNoMes, diasFolgaNoMes, faltasNoMes, diasIncompletosDoMes,
-    extrasPagasDoMes, resumoHorasMes
+    extrasPagasDoMes, resumoHorasMes, movimentoHoraExtra
   };
 });
